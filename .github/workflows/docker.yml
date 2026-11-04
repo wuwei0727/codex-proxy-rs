@@ -43,9 +43,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: Build frontend
+      - name: Build UI library & Frontend
         run: |
-          cd frontend
+          cd modules/ui
+          pnpm install --no-frozen-lockfile
+          pnpm build
+          cd ../../frontend
           pnpm install --no-frozen-lockfile
           pnpm build
 
