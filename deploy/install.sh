@@ -116,6 +116,7 @@ download_release_files() {
     log "下载 ${CPR_RELEASE_TAG} compose.yaml"
     if download "${base_url}/compose.yaml" "$COMPOSE_FILE" 2>/dev/null && \
        download "${base_url}/config.example.yaml" "$CONFIG_EXAMPLE" 2>/dev/null; then
+      download "${base_url}/cpr.sh" "${DEPLOY_DIR}/cpr.sh" 2>/dev/null || true
       if grep -q '^name: codex-proxy-rs$' "$COMPOSE_FILE" 2>/dev/null && \
          grep -q '^schema_version:' "$CONFIG_EXAMPLE" 2>/dev/null; then
         return 0
@@ -129,11 +130,30 @@ download_release_files() {
   download "${base_url}/compose.yaml" "$COMPOSE_FILE"
   log "从 main 分支下载配置模板 config.example.yaml"
   download "${base_url}/config.example.yaml" "$CONFIG_EXAMPLE"
+  download "${base_url}/cpr.sh" "${DEPLOY_DIR}/cpr.sh" 2>/dev/null || true
 
   grep -q '^name: codex-proxy-rs$' "$COMPOSE_FILE" \
     || die "下载到的 compose.yaml 内容异常。"
   grep -q '^schema_version:' "$CONFIG_EXAMPLE" \
     || die "下载到的 config.example.yaml 内容异常。"
+}
+
+install_cpr_shortcut() {
+  local target="/usr/local/bin/cpr"
+  local cpr_src="${DEPLOY_DIR}/cpr.sh"
+
+  if [[ ! -f "$cpr_src" ]]; then
+    curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/deploy/cpr.sh" -o "$cpr_src" 2>/dev/null || true
+  fi
+
+  if [[ -f "$cpr_src" ]]; then
+    log "安装快捷管理命令到 ${target}"
+    run_root cp "$cpr_src" "$target" 2>/dev/null || true
+    if [[ -f "$target" ]]; then
+      run_root sed -i "s|^INSTALL_DIR=.*|INSTALL_DIR=\"${INSTALL_DIR}\"|" "$target" 2>/dev/null || true
+      run_root chmod +x "$target" 2>/dev/null || true
+    fi
+  fi
 }
 
 random_password() {
@@ -323,6 +343,7 @@ main() {
   )
 
   fix_runtime_permissions
+  install_cpr_shortcut
 
   log "启动服务"
   (
@@ -362,12 +383,16 @@ main() {
   printf '安装目录：      %s\n' "$INSTALL_DIR"
   printf '配置文件：      %s\n' "$CONFIG_FILE"
   printf '\n'
-  printf '常用命令：\n'
-  printf '  cd %q\n' "$INSTALL_DIR"
-  printf '  docker compose -f deploy/compose.yaml ps\n'
-  printf '  docker compose -f deploy/compose.yaml logs -f codex-proxy-rs\n'
-  printf '  docker compose -f deploy/compose.yaml restart codex-proxy-rs\n'
-  printf '  docker compose -f deploy/compose.yaml down\n'
+  printf '快捷管理命令（已安装至全局）：\n'
+  printf '  cpr            输入 cpr 即可打开交互式管理菜单\n'
+  printf '  cpr logs       实时查看主服务运行日志 (Ctrl+C 退出)\n'
+  printf '  cpr update     一键更新升级到最新版本\n'
+  printf '  cpr restart    重启服务\n'
+  printf '  cpr status     查看容器运行状态\n'
+  printf '  cpr info       查看后台地址与管理员账号密码\n'
+  printf '\n'
+  printf '传统 Compose 命令：\n'
+  printf '  cd %q && docker compose -f deploy/compose.yaml ps\n' "$INSTALL_DIR"
   printf '\n'
   if [[ "$existing_config" -eq 0 ]]; then
     printf '%b请立即保存管理员密码。%b\n' "$YELLOW" "$NC"
