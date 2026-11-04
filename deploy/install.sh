@@ -6,7 +6,7 @@ umask 0077
 # 新安装使用同一个 Release 的 compose.yaml 与 config.example.yaml；
 # 已存在 deploy/config.yaml 时保留整套部署文件，不执行版本升级。
 
-REPO="zyycn/codex-proxy-rs"
+REPO="wuwei0727/codex-proxy-rs"
 CPR_RELEASE_TAG="${CPR_RELEASE_TAG:-}"
 INSTALL_DIR="${INSTALL_DIR:-$PWD/codex-proxy-rs}"
 DEPLOY_DIR="${INSTALL_DIR}/deploy"
@@ -82,13 +82,14 @@ resolve_release_tag() {
 
   if [[ -z "$CPR_RELEASE_TAG" ]]; then
     release_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
-      "https://github.com/${REPO}/releases/latest")"
+      "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)"
     CPR_RELEASE_TAG="${release_url%/}"
     CPR_RELEASE_TAG="${CPR_RELEASE_TAG##*/}"
   fi
 
-  [[ "$CPR_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] \
-    || die "无法确定有效的发布版本：${CPR_RELEASE_TAG:-<空>}"
+  if [[ ! "$CPR_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+    CPR_RELEASE_TAG=""
+  fi
 }
 
 download() {
@@ -110,11 +111,23 @@ download_release_files() {
   local base_url
 
   resolve_release_tag
-  base_url="https://github.com/${REPO}/releases/download/${CPR_RELEASE_TAG}"
+  if [[ -n "$CPR_RELEASE_TAG" ]]; then
+    base_url="https://github.com/${REPO}/releases/download/${CPR_RELEASE_TAG}"
+    log "下载 ${CPR_RELEASE_TAG} compose.yaml"
+    if download "${base_url}/compose.yaml" "$COMPOSE_FILE" 2>/dev/null && \
+       download "${base_url}/config.example.yaml" "$CONFIG_EXAMPLE" 2>/dev/null; then
+      if grep -q '^name: codex-proxy-rs$' "$COMPOSE_FILE" 2>/dev/null && \
+         grep -q '^schema_version:' "$CONFIG_EXAMPLE" 2>/dev/null; then
+        return 0
+      fi
+    fi
+  fi
 
-  log "下载 ${CPR_RELEASE_TAG} compose.yaml"
+  # 无 Release 时回退到 main 分支获取最新部署配置
+  base_url="https://raw.githubusercontent.com/${REPO}/main/deploy"
+  log "从 main 分支下载部署配置 compose.yaml"
   download "${base_url}/compose.yaml" "$COMPOSE_FILE"
-  log "下载 ${CPR_RELEASE_TAG} config.example.yaml"
+  log "从 main 分支下载配置模板 config.example.yaml"
   download "${base_url}/config.example.yaml" "$CONFIG_EXAMPLE"
 
   grep -q '^name: codex-proxy-rs$' "$COMPOSE_FILE" \
