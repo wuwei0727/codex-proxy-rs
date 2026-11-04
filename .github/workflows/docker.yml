@@ -9,6 +9,7 @@ on:
       - 'frontend/**'
       - 'modules/ui/**'
       - 'deploy/**'
+      - 'release/version.yaml'
       - '.github/workflows/docker.yml'
   workflow_dispatch:
 
@@ -71,6 +72,13 @@ jobs:
             type=raw,value=latest
             type=sha,format=short
 
+      - name: Extract build metadata
+        id: build_meta
+        run: |
+          VERSION=$(grep '^version:' release/version.yaml | sed -E 's/version:\s*"?(.*)"?/\1/')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
       - name: Build and push runtime image
         uses: docker/build-push-action@v6
         with:
@@ -82,6 +90,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
+            CPR_VERSION=${{ steps.build_meta.outputs.version }}
             CPR_GIT_SHA=${{ github.sha }}
+            CPR_BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
+            CPR_BUILD_TYPE=release
           cache-from: type=gha
           cache-to: type=gha,mode=max

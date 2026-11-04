@@ -81,8 +81,14 @@ CMD ["/app/bin/codex-proxy-rs"]
 
 FROM runtime-base AS runtime
 
+ARG CPR_VERSION=
+ARG CPR_GIT_SHA=unknown
+
 COPY --from=backend-builder --chown=cpr:cpr /tmp/codex-proxy-rs /app/bin/codex-proxy-rs
 COPY --from=frontend-builder --chown=cpr:cpr /app/frontend/dist ./web/dist
+
+RUN mkdir -p /app/bin/plugins/official &&     printf '{\n  "schema_version": 1,\n  "sealed": true,\n  "gateway_version": "%s",\n  "gateway_git_sha": "%s",\n  "plugin_host": {\n    "schema_version": 2,\n    "manifest_schema_versions": [2],\n    "protocol_versions": [7],\n    "capabilities": [\n      { "capability": "frontend_authentication", "versions": [2] },\n      { "capability": "scheduler", "versions": [3] },\n      { "capability": "model_router", "versions": [2] },\n      { "capability": "model_catalog", "versions": [2] },\n      { "capability": "retry_policy", "versions": [2] },\n      { "capability": "middleware", "versions": [6] },\n      { "capability": "upstream_adapter", "versions": [5] },\n      { "capability": "observer", "versions": [2] },\n      { "capability": "command_line", "versions": [1] },\n      { "capability": "management", "versions": [2] },\n      { "capability": "maintenance", "versions": [1] }\n    ]\n  },\n  "plugins": []\n}\n' "$CPR_VERSION" "$CPR_GIT_SHA" > /app/bin/plugins/official/plugin-release-manifest.json &&     chmod 0444 /app/bin/plugins/official/plugin-release-manifest.json &&     chmod 0555 /app/bin/plugins/official &&     chmod 0755 /app/bin/plugins &&     chown -R cpr:cpr /app/bin/plugins
+
 USER cpr
 
 FROM runtime-base AS runtime-prebuilt
