@@ -16,6 +16,12 @@ const props = defineProps<{
 const { t } = useI18n({ useScope: 'global' })
 
 const tokenDetails = computed(() => usageTokenDetails(props.record.tokenDetails))
+
+const hasCache = computed(() => {
+  const cached = props.record.tokenDetails?.cachedInputTokens
+  return typeof cached === 'number' && cached > 0
+})
+
 const tokenItems = computed(() => [
   {
     label: t('usage.tokens.enterToken'),
@@ -41,24 +47,39 @@ const tokenItems = computed(() => [
 </script>
 
 <template>
-  <div class="flex items-center justify-end gap-1.5">
-    <div
-      class="grid grid-cols-[auto_auto] items-center justify-end gap-x-2 gap-y-1 font-mono text-z-sm leading-none font-bold tabular-nums"
-    >
-      <span class="inline-flex items-center gap-1 text-z-success-text">
-        <ArrowDown class="size-3" />
-        {{ tokenDetails.inputTokensDisplay }}
+  <div class="flex max-w-full min-w-0 items-center justify-end gap-1 overflow-hidden">
+    <div class="flex flex-col items-end min-w-0 leading-none">
+      <!-- 第一行：总 Token -->
+      <span class="font-mono text-[12px] leading-tight font-heavy tabular-nums text-z-text">
+        {{ tokenDetails.totalTokensDisplay || '—' }}
       </span>
-      <span class="inline-flex items-center gap-1 text-z-info-text">
-        <ArrowUp class="size-3" />
-        {{ tokenDetails.outputTokensDisplay }}
-      </span>
-      <span class="col-span-2 inline-flex items-center justify-end gap-1 text-z-info-text">
-        <Archive class="size-3" />
-        {{ tokenDetails.cachedInputTokensDisplay }}
-      </span>
+
+      <!-- 第二行：输入 ↓ · 输出 ↑ -->
+      <div class="mt-0.5 flex items-center justify-end gap-1.5 font-mono text-[10.5px] leading-tight tabular-nums whitespace-nowrap">
+        <span class="inline-flex items-center gap-0.5 text-z-success-text font-bold" :title="t('usage.tokens.enterToken')">
+          <ArrowDown class="size-2.5" stroke-width="2.5" />
+          {{ tokenDetails.inputTokensDisplay }}
+        </span>
+        <span class="inline-flex items-center gap-0.5 text-z-info-text font-bold" :title="t('usage.tokens.outputToken')">
+          <ArrowUp class="size-2.5" stroke-width="2.5" />
+          {{ tokenDetails.outputTokensDisplay }}
+        </span>
+      </div>
+
+      <!-- 第三行：缓存 🗃（专属紫色 text-z-purple-text） -->
+      <div
+        v-if="hasCache"
+        class="mt-0.5 flex items-center justify-end font-mono text-[10px] leading-tight tabular-nums whitespace-nowrap text-z-purple-text font-bold"
+        :title="t('usage.tokens.cacheReadTokens')"
+      >
+        <span class="inline-flex items-center gap-0.5">
+          <Archive class="size-2.5" stroke-width="2.5" />
+          {{ tokenDetails.cachedInputTokensDisplay }}
+        </span>
+      </div>
     </div>
 
+    <!-- 详情弹窗触发图标 (i) -->
     <UsageDetailPopover :title="t('usage.tokens.tokenDetails')" :trigger-label="t('usage.tokens.viewTokenDetails')">
       <div class="grid gap-1.5 text-z-text-secondary">
         <div v-for="item in tokenItems" :key="item.label" class="flex justify-between gap-4">

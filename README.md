@@ -12,12 +12,28 @@
 [![GHCR](https://img.shields.io/badge/GHCR-codex--proxy--rs-2496ED?logo=docker&logoColor=white&style=flat-square)](https://github.com/zyycn/codex-proxy-rs/pkgs/container/codex-proxy-rs)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
-[快速预览](#快速预览) · [快速开始](#快速开始) · [客户端接入](#客户端接入) · [文档](#文档) · [社区](#社区) · [许可证](#许可证)
+[快速预览](#快速预览) · [界面特色](#界面特色) · [快速开始](#快速开始) · [客户端接入](#客户端接入) · [文档](#文档) · [社区](#社区) · [许可证](#许可证)
 
 </div>
 
 > [!NOTE]
 > 本项目提供 Responses API 和 Chat Completions API；Chat Completions 请求通过 Responses 链路执行，支持范围见 [API 参考](docs/api.md#chat-completions-请求)
+
+## 🎨 界面特色
+
+### 1. 全列一屏直观全览
+标准桌面下一屏完整呈现全部 14 列核心指标（账号/密钥、订阅、平台、模型、推理强度、端点、传输、TOKEN、费用、延迟、速率、时间、IP、操作），无需横向拖拽滚动条。
+
+<p align="center">
+  <img src="docs/images/all-columns-view.jpg" alt="全列一屏直观全览" width="100%" />
+</p>
+
+### 2. 账号与密钥一键脱敏
+支持一键切换账号明文与遮罩模式，敏感信息快速打码，便于日常监控与安全截图分享。
+
+| 脱敏前（完整显示） | 脱敏后（一键打码） |
+| :---: | :---: |
+| ![脱敏前](docs/images/mask-before.jpg) | ![脱敏后](docs/images/mask-after.jpg) |
 
 ## 快速预览
 

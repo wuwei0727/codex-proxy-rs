@@ -111,6 +111,7 @@
       "reasoningEffort": "推理强度",
       "endpoint": "端点",
       "upstream": "上游",
+      "access": "接入",
       "cost": "费用",
       "latency": "延迟",
       "time": "时间",
@@ -364,6 +365,13 @@
     "successfulRequestAverage": "成功请求平均值",
     "usageOverview": "使用概览",
     "noUsageRecords": "暂无使用记录",
-    "transportDirection": "上游 {upstream} · 接入 {client}"
+"transportDirection": "上游 {upstream} · 接入 {client}",
+    "accountDisplay": {
+      "full": "完整",
+      "masked": "脱敏",
+      "showFullHint": "显示完整账号与完整 UA",
+      "showMaskedHint": "脱敏账号并隐藏 UA"
+    }
   }
 }
+

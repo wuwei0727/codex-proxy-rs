@@ -10,6 +10,7 @@ import { useI18n } from 'vue-i18n'
 import ProviderFilter from '@/components/ProviderFilter.vue'
 import { usageRecordColumns } from '@/components/usage/shared/columns'
 import UsageRecordsTable from '@/components/usage/UsageRecordsTable.vue'
+import AccountDisplayToggle from '@/components/usage/AccountDisplayToggle.vue'
 import UsageRecordStatusFilter from '@/components/usage/UsageRecordStatusFilter.vue'
 import UsageErrorDetailModal from './components/UsageErrorDetailModal.vue'
 import UsageFilters from './components/UsageFilters.vue'
@@ -143,6 +144,7 @@ watch(timeRange, () => {
           >
             <template #actions>
               <UsageRecordStatusFilter v-model="recordView" />
+              <AccountDisplayToggle />
               <ZTableColumnSettings
                 :options="columnOptions"
                 @change="setColumnVisible"
@@ -161,7 +163,7 @@ watch(timeRange, () => {
               :empty-text="t('usage.page.noRequestsMatchTheseFilters')"
             >
               <template #actions="{ row }">
-                <div class="flex items-center justify-start">
+                <div class="flex items-center justify-center">
                   <ZIconButton
                     size="small"
                     :aria-label="isErrorUsageRecord(row) ? t('usage.page.viewErrorDetails') : t('usage.page.viewUsageRecordDetails')"

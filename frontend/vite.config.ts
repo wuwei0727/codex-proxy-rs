@@ -32,9 +32,15 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/dev': {
-          target: 'http://127.0.0.1:8080',
+          target: 'https://cpr.ranran0112.ccwu.cc',
+          secure: false,
           changeOrigin: true,
-          cookiePathRewrite: { '/api/auth': '/dev/api/auth' },
+          cookieDomainRewrite: '127.0.0.1',
+          cookiePathRewrite: {
+            '/api/auth': '/dev/api/auth',
+            '/api': '/dev/api',
+            '/': '/',
+          },
           rewrite: path => path.replace(/^\/dev/, ''),
         },
       },

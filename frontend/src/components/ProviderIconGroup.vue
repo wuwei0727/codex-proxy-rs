@@ -8,9 +8,11 @@ const props = withDefaults(
   defineProps<{
     provider?: string | null
     authenticationKind?: string | null
+    hideAuthenticationKind?: boolean
     size?: 'xs' | 'sm' | 'md'
   }>(),
   {
+    hideAuthenticationKind: false,
     size: 'md',
   },
 )
@@ -22,7 +24,7 @@ const providerIconComponent = computed(() => normalizedProvider.value
   ? providerIcon(normalizedProvider.value)
   : undefined)
 const authenticationIconComponent = computed(() => authenticationIcon(props.authenticationKind))
-const showAuthenticationKind = computed(() => props.authenticationKind !== undefined)
+const showAuthenticationKind = computed(() => !props.hideAuthenticationKind && props.authenticationKind !== undefined && props.authenticationKind !== null)
 const groupGapClass = computed(() => {
   if (props.size === 'xs')
     return 'gap-0.75'
@@ -45,9 +47,17 @@ const iconClass = computed(() => {
     : 'size-4'
 })
 
-const providerLabel = computed(() => formatProviderLabel(props.provider, t('common.providers.unknown')))
+const baseProviderLabel = computed(() => formatProviderLabel(props.provider, t('common.providers.unknown')))
 
 const authenticationLabel = computed(() => formatAuthenticationLabel(props.authenticationKind))
+
+const providerLabel = computed(() => {
+  if (props.hideAuthenticationKind && props.authenticationKind) {
+    const auth = authenticationLabel.value
+    return auth ? `${baseProviderLabel.value} · ${auth}` : baseProviderLabel.value
+  }
+  return baseProviderLabel.value
+})
 </script>
 
 <template>

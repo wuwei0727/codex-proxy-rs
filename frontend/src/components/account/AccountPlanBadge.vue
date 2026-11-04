@@ -27,6 +27,23 @@ const planPalettes: Record<string, string> = {
   plus: 'bg-z-blue-container-strong text-z-blue-on-container',
   pro: 'bg-z-purple-container-strong text-z-purple-on-container',
   prolite: 'bg-z-purple-container text-z-purple-on-container',
+  pro_5x: 'bg-z-purple-container text-z-purple-on-container',
+  promax: 'bg-z-purple-container-strong text-z-purple-on-container ring-1 ring-z-purple-border/50',
+  pro_10x: 'bg-z-purple-container-strong text-z-purple-on-container ring-1 ring-z-purple-border/50',
+  self_serve_business_prolite: 'bg-z-purple-container text-z-purple-on-container',
+  business_5x: 'bg-z-purple-container text-z-purple-on-container',
+}
+
+const PLAN_DISPLAY_ALIASES: Record<string, string> = {
+  prolite: 'Pro 5x',
+  pro_lite: 'Pro 5x',
+  'pro-lite': 'Pro 5x',
+  pro_5x: 'Pro 5x',
+  promax: 'Pro 10x',
+  pro_max: 'Pro 10x',
+  'pro-max': 'Pro 10x',
+  pro_10x: 'Pro 10x',
+  self_serve_business_prolite: 'Business 5x',
 }
 
 const fallbackPalettes = [
@@ -38,10 +55,30 @@ const fallbackPalettes = [
 
 const rawPlanType = computed(() => props.authenticationKind === 'api_key'
   ? 'api'
-  : props.planType?.trim() || '')
-const displayText = computed(() => props.authenticationKind === 'api_key'
-  ? 'API'
-  : props.planTypeDisplay)
+  : props.planType?.trim() || props.planTypeDisplay?.trim() || '')
+
+const displayText = computed(() => {
+  if (props.authenticationKind === 'api_key')
+    return 'API'
+
+  const normalizedKey = (props.planType || props.planTypeDisplay || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+
+  if (PLAN_DISPLAY_ALIASES[normalizedKey])
+    return PLAN_DISPLAY_ALIASES[normalizedKey]
+
+  return props.planTypeDisplay || props.planType || ''
+})
+
+const tooltipText = computed(() => {
+  if (!displayText.value)
+    return undefined
+  if (props.planType && props.planType.toLowerCase() !== displayText.value.toLowerCase())
+    return `${displayText.value} (${props.planType})`
+  return displayText.value
+})
 
 const sizeClass = computed(() => {
   if (props.size === 'xs')
@@ -52,7 +89,7 @@ const sizeClass = computed(() => {
 })
 
 const paletteClass = computed(() => {
-  const key = rawPlanType.value.toLowerCase()
+  const key = rawPlanType.value.toLowerCase().replace(/[\s-]+/g, '_')
   const planPalette = planPalettes[key]
   if (planPalette)
     return planPalette
@@ -67,7 +104,7 @@ const paletteClass = computed(() => {
     v-else
     class="inline-flex min-w-0 max-w-full items-center justify-center gap-1 whitespace-nowrap leading-none shadow-z-tertiary"
     :class="[sizeClass, paletteClass]"
-    :title="displayText || undefined"
+    :title="tooltipText"
   >
     <span class="truncate">{{ displayText }}</span>
     <span v-if="count !== undefined" class="shrink-0 tabular-nums">{{ count }}</span>

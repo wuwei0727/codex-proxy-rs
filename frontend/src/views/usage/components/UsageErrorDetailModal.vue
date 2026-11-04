@@ -5,7 +5,8 @@ import { ZButton, ZDialog } from '@codex-proxy/ui'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { usageErrorSummary } from '@/components/usage/shared/errors'
-import { usageAccountText, usageModelDisplay, usageTransportType } from '@/components/usage/shared/presenter'
+import { useAccountDisplayMode } from '@/composables/useAccountDisplayMode'
+import { usageAccountDisplayText, usageModelDisplay, usageTransportType } from '@/components/usage/shared/presenter'
 import { formatDuration } from '@/utils/format'
 import { attemptOutcomeClass, attemptOutcomeText, visibleResponseText } from '../utils/detail'
 import DiagnosticsDownloadButton from './DiagnosticsDownloadButton.vue'
@@ -21,6 +22,7 @@ const emit = defineEmits<{ retry: [] }>()
 const { t } = useI18n({ useScope: 'global' })
 
 const open = defineModel<boolean>({ default: false })
+const { accountDisplayMode } = useAccountDisplayMode()
 
 const panelClass = 'min-w-0 rounded-z-card bg-z-fill-quaternary px-4 py-3.5'
 const panelTitleClass = 'm-0 text-z-sm leading-none font-heavy text-z-text-secondary'
@@ -64,7 +66,7 @@ const contextItems = computed(() => [
   {
     label: t('accounts.account'),
     value: props.record
-      ? usageAccountText(props.record)
+      ? usageAccountDisplayText(props.record, accountDisplayMode.value)
       : null,
     mono: true,
     fullWidth: true,
@@ -170,7 +172,7 @@ const attempts = computed(() => (props.record?.attempts ?? []).map(attempt => ({
     },
     {
       label: t('accounts.account'),
-      value: usageAccountText(attempt),
+      value: usageAccountDisplayText(attempt, accountDisplayMode.value),
       mono: true,
     },
     {

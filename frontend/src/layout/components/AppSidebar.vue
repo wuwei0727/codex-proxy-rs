@@ -225,8 +225,8 @@ async function handleLogout() {
 const sidebarEl = ref<HTMLElement | null>(null)
 const brandLabelEl = ref<HTMLElement | null>(null)
 const navSignalEl = useTemplateRef<HTMLElement>('navSignal')
-const collapsedSidebarWidth = 88
-const expandedSidebarWidth = 251
+const collapsedSidebarWidth = 64
+const expandedSidebarWidth = 204
 const sidebarWidth = computed(() => (isCollapsed.value ? collapsedSidebarWidth : expandedSidebarWidth))
 const brandLabelVisible = shallowRef(!isCollapsed.value)
 const themeToggleLabel = computed(() => (effectiveTheme.value === 'dark'
@@ -446,12 +446,12 @@ onBeforeUnmount(() => {
     class="z-20 h-dvh shrink-0 flex-col overflow-hidden bg-(--z-layout-sider-bg) shadow-z-layout-sider"
     :class="[
       mobile ? 'flex' : 'hidden min-[961px]:flex',
-      isCollapsed ? 'w-22 basis-22 items-center' : 'w-62.75 basis-62.75',
+      isCollapsed ? 'w-16 basis-16 items-center' : 'w-[204px] basis-[204px]',
     ]"
   >
     <div
-      class="mx-4 mt-6 grid h-12 shrink-0 grid-cols-[44px_minmax(0,1fr)] items-center"
-      :class="isCollapsed ? 'w-11 justify-start' : 'self-stretch gap-3'"
+      class="mt-6 grid h-12 shrink-0 grid-cols-[44px_minmax(0,1fr)] items-center"
+      :class="isCollapsed ? 'mx-auto w-11 justify-center' : 'mx-3 self-stretch gap-2.5'"
     >
       <ZMotionIcon
         variant="brand"
@@ -459,9 +459,9 @@ onBeforeUnmount(() => {
       >
         <AppBrandMark class="block size-11 select-none" />
       </ZMotionIcon>
-      <span v-show="brandLabelVisible" ref="brandLabelEl" class="grid min-w-33 content-center overflow-hidden">
+      <span v-show="brandLabelVisible" ref="brandLabelEl" class="grid min-w-0 flex-1 content-center overflow-hidden">
         <strong class="text-base leading-[1.1] font-heavy text-z-text"> Codex Proxy </strong>
-        <span class="mt-1.5 flex h-4.5 min-w-0 items-center gap-2">
+        <span class="mt-1.5 flex h-4.5 min-w-0 items-center gap-1.5">
           <span class="shrink-0 text-xs leading-none font-emphasis text-z-text-secondary"> Rust build </span>
           <button
             v-if="hasVersionLabel"
@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
     </div>
 
     <ZScrollbar class="my-6 w-full flex-1">
-      <div class="px-4">
+      <div :class="isCollapsed ? 'px-2' : 'px-2'">
         <!-- 焦点环绘制在按钮内侧，避免被滚动区和折叠菜单裁切 -->
         <nav class="relative grid gap-3" :class="isCollapsed ? 'mx-auto w-11.5' : 'w-full'" :aria-label="t('navigation.mainLabel')">
           <span
@@ -503,7 +503,7 @@ onBeforeUnmount(() => {
                     type="button"
                     class="inline-flex h-11.5 cursor-pointer items-center rounded-z border-0 bg-transparent text-sm leading-[1.15] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-z-control-outline"
                     :class="[
-                      isCollapsed ? 'w-11.5 justify-center' : 'w-full gap-3 px-4',
+                      isCollapsed ? 'w-11.5 justify-center' : 'w-full gap-2 px-2.5',
                       isActive(item.path)
                         ? navFeedbackMuted
                           ? 'font-bold text-z-text transition-none'
@@ -585,7 +585,7 @@ onBeforeUnmount(() => {
                   type="button"
                   class="relative z-10 inline-flex h-11.5 cursor-pointer items-center rounded-z border-0 text-sm leading-[1.15] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-z-control-outline"
                   :class="[
-                    isCollapsed ? 'w-11.5 justify-center' : 'w-full gap-3 px-4',
+                    isCollapsed ? 'w-11.5 justify-center' : 'w-full gap-2 px-2.5',
                     isActive(item.path)
                       ? navFeedbackMuted
                         ? 'bg-transparent font-bold text-z-text transition-none'
@@ -613,20 +613,32 @@ onBeforeUnmount(() => {
       </div>
     </ZScrollbar>
 
-    <div class="mx-4 mb-6 shrink-0" :class="isCollapsed ? 'w-11' : 'self-stretch'">
+    <div class="mb-4 shrink-0" :class="isCollapsed ? 'mx-auto w-11' : 'mx-2 self-stretch'">
       <div
-        class="bg-z-fill-quaternary"
-        :class="isCollapsed ? 'grid gap-1 rounded-z p-1' : 'grid h-11 grid-cols-[4.25rem_auto] items-center justify-between rounded-z-lg px-2'"
+        class="bg-z-fill-quaternary rounded-z-lg"
+        :class="isCollapsed ? 'grid gap-1 p-1' : 'p-2 flex flex-col gap-2'"
       >
-        <span
-          v-if="!isCollapsed"
-          class="inline-flex h-7 items-center justify-self-start gap-1.5 whitespace-nowrap rounded-lg bg-z-success-container px-2 text-xs leading-none font-emphasis text-z-success-on-container"
-        >
-          <i class="size-1.5 rounded-full bg-z-success" />
-          {{ t('navigation.online') }}
-        </span>
+        <div v-if="!isCollapsed" class="flex items-center justify-between">
+          <span
+            class="inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-md bg-z-success-container px-2 text-[11px] leading-none font-emphasis text-z-success-on-container"
+          >
+            <i class="size-1.5 rounded-full bg-z-success" />
+            {{ t('navigation.online') }}
+          </span>
+          <button
+            v-if="hasUpdate"
+            type="button"
+            class="inline-flex items-center gap-1 text-xs text-z-success hover:underline border-0 bg-transparent cursor-pointer"
+            :title="updateButtonLabel"
+            @click="openSystemUpdate"
+          >
+            <ArrowUpCircle :size="16" />
+          </button>
+        </div>
 
-        <div class="flex shrink-0 items-center" :class="isCollapsed ? 'grid gap-1' : 'gap-1'">
+        <div
+          :class="isCollapsed ? 'grid gap-1' : 'flex items-center justify-between pt-1.5 border-t border-z-border/40'"
+        >
           <ZIconButton
             v-if="isCollapsed && hasUpdate"
             type="success" variant="plain"
@@ -644,7 +656,7 @@ onBeforeUnmount(() => {
             :disabled="authStore.loading || !authStore.isAuthenticated"
             @click="handleLogout"
           >
-            <LogOut :size="isCollapsed ? 19 : 18" />
+            <LogOut :size="isCollapsed ? 19 : 16" />
           </ZIconButton>
 
           <ZIconButton
@@ -652,14 +664,14 @@ onBeforeUnmount(() => {
             :aria-label="themeToggleLabel"
             @click="toggleTheme($event)"
           >
-            <Sun v-if="effectiveTheme === 'dark'" :size="isCollapsed ? 19 : 18" />
-            <Moon v-else :size="isCollapsed ? 19 : 18" />
+            <Sun v-if="effectiveTheme === 'dark'" :size="isCollapsed ? 19 : 16" />
+            <Moon v-else :size="isCollapsed ? 19 : 16" />
           </ZIconButton>
 
           <AppLanguageMenu :size="isCollapsed ? 'default' : 'small'" />
 
           <ZIconButton v-if="mobile" size="small" :aria-label="t('navigation.sidebar.close')" @click="emit('close')">
-            <PanelLeftClose :size="18" />
+            <PanelLeftClose :size="16" />
           </ZIconButton>
 
           <ZIconButton
@@ -670,7 +682,7 @@ onBeforeUnmount(() => {
             @click="emit('toggle')"
           >
             <PanelLeftOpen v-if="isCollapsed" :size="19" />
-            <PanelLeftClose v-else :size="18" />
+            <PanelLeftClose v-else :size="16" />
           </ZIconButton>
         </div>
       </div>

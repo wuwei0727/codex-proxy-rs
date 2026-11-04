@@ -16,7 +16,7 @@ import UsageRecordStatusFilter from '@/components/usage/UsageRecordStatusFilter.
 import UsageRouteCell from '@/components/usage/UsageRouteCell.vue'
 import UsageTimeCell from '@/components/usage/UsageTimeCell.vue'
 import UsageTokenCell from '@/components/usage/UsageTokenCell.vue'
-import UsageTransportCell from '@/components/usage/UsageTransportCell.vue'
+import UsageTransportBadge from '@/components/usage/UsageTransportBadge.vue'
 
 defineProps<{ rows: KeyUsageRecord[], pagination: Pagination, loading: boolean }>()
 
@@ -49,7 +49,10 @@ const { visibleColumns, columnOptions, setColumnVisible, setColumnOrder, resetCo
           <UsageRouteCell :record="row" />
         </template>
         <template #transport="{ row }">
-          <UsageTransportCell :upstream="row.upstreamTransport" :client="row.clientTransport" />
+          <UsageTransportBadge
+            :client-transport="row.clientTransport"
+            :upstream-transport="row.upstreamTransport"
+          />
         </template>
         <template #tokenDetails="{ row }">
           <UsageTokenCell v-if="row.tokenDetails" :record="{ tokenDetails: row.tokenDetails }" />

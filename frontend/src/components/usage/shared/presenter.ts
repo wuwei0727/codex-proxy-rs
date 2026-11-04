@@ -1,6 +1,8 @@
 import type { UsageListRecord, UsageRecordDetail, UsageTokenDetails } from '@/api'
+import type { AccountDisplayMode } from '@/composables/useAccountDisplayMode'
 import { t } from '@/i18n'
 import { formatCompactNumber, formatDuration, formatInteger } from '@/utils/format'
+import { maskAccountText } from '@/utils/mask'
 
 // 列表与详情使用独立读模型，展示函数只依赖两者的公共字段。
 type UsageCommonRecord = UsageListRecord | UsageRecordDetail
@@ -64,8 +66,35 @@ export function usageTransportTypeClass(transport?: string | null) {
   return 'bg-z-fill-tertiary text-z-text-secondary'
 }
 
+export function usageTransportTextColorClass(transport?: string | null) {
+  const type = usageTransportType(transport)
+  if (type === 'WS')
+    return 'text-z-blue-text font-heavy'
+  if (type === 'SSE')
+    return 'text-z-green-text font-heavy'
+  return 'text-z-text-secondary font-bold'
+}
+
+export function usageTransportFullLabel(transport?: string | null) {
+  if (transport === 'websocket')
+    return 'WebSocket'
+  if (transport === 'http_sse')
+    return 'SSE'
+  if (transport === 'http' || transport === 'http_json')
+    return 'HTTP'
+  return transport || '—'
+}
+
 export function usageAccountText(record: Pick<UsageCommonRecord, 'accountEmail' | 'accountName' | 'accountId'>) {
   return record.accountEmail || record.accountName || record.accountId || '—'
+}
+
+export function usageAccountDisplayText(
+  record: Pick<UsageCommonRecord, 'accountEmail' | 'accountName' | 'accountId'>,
+  displayMode: AccountDisplayMode = 'full',
+) {
+  const full = usageAccountText(record)
+  return displayMode === 'masked' ? maskAccountText(full) : full
 }
 
 export function usageClientIp(record: { clientIp?: string | null }) {

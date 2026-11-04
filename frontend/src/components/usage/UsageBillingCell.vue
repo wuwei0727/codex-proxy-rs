@@ -132,8 +132,8 @@ function itemValueClass(tone?: string, accent?: boolean) {
 </script>
 
 <template>
-  <div class="flex items-center justify-end gap-1.5">
-    <span class="font-mono text-z font-heavy tabular-nums text-z-green-text">
+  <div class="flex max-w-full min-w-0 items-center justify-end gap-1 overflow-hidden">
+    <span class="font-mono text-z font-heavy tabular-nums text-z-green-text shrink-0">
       {{ usageBillingText(record) }}
     </span>
 

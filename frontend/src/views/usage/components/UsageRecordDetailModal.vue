@@ -9,7 +9,7 @@ import { useI18n } from 'vue-i18n'
 import BaseChart from '@/components/charts/BaseChart.vue'
 import { chartTooltipStyle } from '@/components/charts/tooltip'
 import {
-  usageAccountText,
+  usageAccountDisplayText,
   usageBillingText,
   usageClientIp,
   usageLatencyDetails,
@@ -19,6 +19,7 @@ import {
   usageUserAgent,
 } from '@/components/usage/shared/presenter'
 import { useChartPalette } from '@/composables/useChartPalette'
+import { useAccountDisplayMode } from '@/composables/useAccountDisplayMode'
 
 import { formatDuration, formatInteger } from '@/utils/format'
 import { attemptOutcomeClass, attemptOutcomeText, displayValue, fieldLabelClass, fieldValueBaseClass, visibleRequestText, visibleResponseText } from '../utils/detail'
@@ -41,6 +42,7 @@ const { t } = useI18n({ useScope: 'global' })
 const open = defineModel<boolean>({ default: false })
 
 const { palette } = useChartPalette()
+const { accountDisplayMode } = useAccountDisplayMode()
 
 const requestText = computed(() => props.record
   ? visibleRequestText(props.record)
@@ -61,7 +63,7 @@ const panelClass = 'min-w-0 rounded-z-card bg-z-fill-quaternary px-4 py-3.5'
 const panelTitleClass = 'm-0 text-z-sm leading-none font-heavy text-z-text-secondary'
 
 const accountDisplay = computed(() => props.record
-  ? usageAccountText(props.record)
+  ? usageAccountDisplayText(props.record, accountDisplayMode.value)
   : '—')
 const finalAttemptIndex = computed(() => {
   const attempts = props.record?.attempts ?? []

@@ -111,6 +111,7 @@
       "reasoningEffort": "Effort",
       "endpoint": "Endpoint",
       "upstream": "Upstream",
+      "access": "Access",
       "cost": "Cost",
       "latency": "Latency",
       "time": "Time",
@@ -364,6 +365,13 @@
     "successfulRequestAverage": "Successful requests only",
     "usageOverview": "Usage overview",
     "noUsageRecords": "No usage records",
-    "transportDirection": "Upstream {upstream} · Client {client}"
+"transportDirection": "Upstream {upstream} · Client {client}",
+    "accountDisplay": {
+      "full": "Full",
+      "masked": "Masked",
+      "showFullHint": "Show full account & UA",
+      "showMaskedHint": "Mask account & hide UA"
+    }
   }
 }
+
