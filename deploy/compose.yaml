@@ -40,6 +40,9 @@ services:
       retries: 10
     security_opt:
       - no-new-privileges:true
+    networks:
+      - default
+      - cpa_default
     logging: *json-logging
 
   redis:
@@ -62,6 +65,9 @@ services:
       retries: 10
     security_opt:
       - no-new-privileges:true
+    networks:
+      - default
+      - cpa_default
     logging: *json-logging
 
   codex-proxy-rs:
@@ -130,8 +136,17 @@ services:
       CPR_UPDATE_EXE_PATH: /app/bin/codex-proxy-rs
       CPR_WEB_DIST_DIR: /app/web/dist
       CPR_ENABLE_SELF_RESTART: 'true'
+    networks:
+      - default
+      - cpa_default
     logging: *json-logging
 
 configs:
   cpr_config:
     file: ./config.yaml
+
+networks:
+  default:
+  cpa_default:
+    name: cpa_default
+    external: true
