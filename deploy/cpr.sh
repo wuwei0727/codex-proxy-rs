@@ -88,6 +88,10 @@ cpr_stop() {
 
 cpr_update() {
   check_env
+  if grep -q "ghcr.io/zyycn/codex-proxy-rs" "$COMPOSE_FILE" 2>/dev/null; then
+    echo -e "${YELLOW}==> 检测到旧镜像源，正在自动切换为你的专属镜像 (wuwei0727)...${NC}"
+    sed -i 's|ghcr.io/zyycn/codex-proxy-rs|ghcr.io/wuwei0727/codex-proxy-rs|g' "$COMPOSE_FILE"
+  fi
   echo -e "${CYAN}==> 正在拉取最新 Docker 镜像...${NC}"
   docker compose -f "$COMPOSE_FILE" pull codex-proxy-rs
   echo -e "${CYAN}==> 正在平滑更新服务...${NC}"
