@@ -3,7 +3,7 @@
 **/node_modules/
 **/.pnpm-store/
 **/.pnpm-cache/
-frontend/dist/
+# frontend/dist/
 frontend/.vite/
 dist/*
 !dist/docker/
@@ -38,4 +38,4 @@ worktrees/
 *.tmp
 
 # 独立源码仓库仅用于联调，发行构建消费锁定依赖。
-modules/
+modules/plugins/

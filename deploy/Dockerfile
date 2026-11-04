@@ -7,13 +7,13 @@ ARG POSTGRES_IMAGE=postgres:18-bookworm@sha256:bbf83594798e144bff365a9c191c5d779
 FROM node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9 AS frontend-builder
 
 WORKDIR /app
-COPY modules ./modules
+COPY modules/ui ./modules/ui
 COPY frontend ./frontend
 WORKDIR /app/frontend
 RUN if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then \
       npm install --global "$(node -p 'require("./package.json").packageManager')" && \
-      pnpm install --no-frozen-lockfile && \
-      pnpm build; \
+      cd ../modules/ui && pnpm install --no-frozen-lockfile && pnpm build && \
+      cd ../../frontend && pnpm install --no-frozen-lockfile && pnpm build; \
     fi
 
 FROM rust:1.99.1-bookworm@sha256:9181b56c2a21ab1d5e73cffe04fc762426d30aa7fac3c91141dd033f49a7fc8b AS backend-builder
