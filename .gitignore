@@ -42,3 +42,4 @@ Thumbs.db
 /worktrees/
 /.cargo/
 *.tmp
+/deploy/__pycache__/

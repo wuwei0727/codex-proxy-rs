@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex Proxy 快捷运维管理工具 (cpr) - 双实例零停机高可用版
+# Codex Proxy 快捷运维管理工具 (cpr) - 双实例滚动更新版
 
 INSTALL_DIR="${CPR_INSTALL_DIR:-/opt/codex-proxy-rs}"
 
@@ -76,7 +76,7 @@ cpr_restart() {
     echo -e "${CYAN}==> 正在重启 ${target}...${NC}"
     docker compose -f "$COMPOSE_FILE" restart "$target"
   else
-    echo -e "${CYAN}==> 正在平滑滚动重启双节点 (零停机)...${NC}"
+    echo -e "${CYAN}==> 依次重启双节点（不等待连接排空）...${NC}"
     docker compose -f "$COMPOSE_FILE" restart codex-proxy-rs-2
     sleep 3
     docker compose -f "$COMPOSE_FILE" restart codex-proxy-rs
@@ -100,65 +100,7 @@ cpr_stop() {
 
 cpr_update() {
   check_env
-  if grep -q "ghcr.io/zyycn/codex-proxy-rs" "$COMPOSE_FILE" 2>/dev/null; then
-    echo -e "${YELLOW}==> 检测到旧镜像源，正在自动切换为你的专属镜像 (wuwei0727)...${NC}"
-    sed -i 's|ghcr.io/zyycn/codex-proxy-rs|ghcr.io/wuwei0727/codex-proxy-rs|g' "$COMPOSE_FILE"
-  fi
-
-  echo -e "${CYAN}=============================================${NC}"
-  echo -e "${CYAN}     开始执行双节点零停机滚动升级            ${NC}"
-  echo -e "${CYAN}=============================================${NC}"
-
-  echo -e "${CYAN}==> [1/4] 预先拉取最新 Docker 镜像 (不影响在线业务)...${NC}"
-  docker compose -f "$COMPOSE_FILE" pull codex-proxy-rs codex-proxy-rs-2
-
-  echo -e "${CYAN}==> [2/4] 滚动更新节点 2 (节点 1 保持在线承接全部流量)...${NC}"
-  docker compose -f "$COMPOSE_FILE" up -d codex-proxy-rs-2
-
-  echo -e "${CYAN}==> 等待节点 2 健康就绪 (平滑预热)...${NC}"
-  local node2_ready=false
-  for i in {1..30}; do
-    if curl -fsS http://127.0.0.1:18081/healthz >/dev/null 2>&1; then
-      node2_ready=true
-      break
-    fi
-    sleep 2
-  done
-
-  if [[ "$node2_ready" != "true" ]]; then
-    echo -e "${RED}[警告] 节点 2 启动探测超时，为确保业务稳定，已终止对节点 1 的更新！${NC}"
-    docker compose -f "$COMPOSE_FILE" ps
-    return 1
-  fi
-  echo -e "${GREEN}==> 节点 2 已健康就绪！${NC}"
-
-  echo -e "${CYAN}==> [3/4] 滚动更新节点 1 (节点 2 保持在线承接全部流量)...${NC}"
-  docker compose -f "$COMPOSE_FILE" up -d codex-proxy-rs
-
-  echo -e "${CYAN}==> 等待节点 1 健康就绪...${NC}"
-  local node1_ready=false
-  for i in {1..30}; do
-    if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1; then
-      node1_ready=true
-      break
-    fi
-    sleep 2
-  done
-
-  if [[ "$node1_ready" != "true" ]]; then
-    echo -e "${RED}[警告] 节点 1 启动探测超时，请检查日志！当前节点 2 仍在线可用。${NC}"
-    docker compose -f "$COMPOSE_FILE" ps
-    return 1
-  fi
-  echo -e "${GREEN}==> 节点 1 已健康就绪！${NC}"
-
-  echo -e "${CYAN}==> [4/4] 重新同步 Nginx 连接池状态...${NC}"
-  nginx -s reload 2>/dev/null || true
-
-  echo -e "${GREEN}=============================================${NC}"
-  echo -e "${GREEN}  双节点平滑滚动升级完成！全程 0 停机 0 中断！${NC}"
-  echo -e "${GREEN}=============================================${NC}"
-  docker compose -f "$COMPOSE_FILE" ps
+  CPR_INSTALL_DIR="$INSTALL_DIR" python3 "$DEPLOY_DIR/rolling_update.py" "$@"
 }
 
 cpr_info() {
@@ -198,7 +140,7 @@ show_menu() {
   echo -e " ${GREEN}5.${NC} 重启集群"
   echo -e " ${GREEN}6.${NC} 启动集群"
   echo -e " ${GREEN}7.${NC} 停止集群"
-  echo -e " ${GREEN}8.${NC} 一键零停机平滑升级 (Rolling Update)"
+  echo -e " ${GREEN}8.${NC} 安全滚动升级 (等待旧连接结束)"
   echo -e " ${GREEN}9.${NC} 查看登录地址与管理员密码"
   echo -e " ${GREEN}0.${NC} 退出菜单"
   echo -e "${GREEN}=============================================${NC}"
@@ -235,7 +177,7 @@ case "${1:-}" in
     cpr_stop
     ;;
   update|upgrade)
-    cpr_update
+    cpr_update "${@:2}"
     ;;
   info)
     cpr_info
@@ -250,7 +192,7 @@ case "${1:-}" in
     echo "  cpr restart  平滑滚动重启"
     echo "  cpr start    启动所有服务"
     echo "  cpr stop     停止所有服务"
-    echo "  cpr update   一键双节点零停机滚动升级"
+    echo "  cpr update   安全双节点滚动升级（--check 仅预检）"
     echo "  cpr info     查看后台地址与管理员账号密码"
     ;;
   *)
