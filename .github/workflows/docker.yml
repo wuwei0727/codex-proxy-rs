@@ -17,6 +17,10 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   docker:
     name: Build & Push Docker Image
@@ -74,10 +78,14 @@ jobs:
 
       - name: Extract build metadata
         id: build_meta
+        shell: ruby {0}
         run: |
-          VERSION=$(grep '^version:' release/version.yaml | sed -E 's/version:\s*"?(.*)"?/\1/')
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          require File.expand_path('.github/scripts/release-metadata.rb')
+          version = ReleaseMetadata.version(YAML.load_file('release/version.yaml').fetch('version'))
+          File.open(ENV.fetch('GITHUB_OUTPUT'), 'a') do |output|
+            output.puts "version=#{version}"
+            output.puts "build_time=#{Time.now.utc.iso8601}"
+          end
 
       - name: Build and push runtime image
         uses: docker/build-push-action@v6
