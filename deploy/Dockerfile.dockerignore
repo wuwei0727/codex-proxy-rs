@@ -3,6 +3,8 @@
 **/node_modules/
 **/.pnpm-store/
 **/.pnpm-cache/
+.buildkit-cache/
+scratch/
 # frontend/dist/
 frontend/.vite/
 dist/*

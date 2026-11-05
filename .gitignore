@@ -43,3 +43,5 @@ Thumbs.db
 /.cargo/
 *.tmp
 /deploy/__pycache__/
+/.buildkit-cache/
+/scratch/

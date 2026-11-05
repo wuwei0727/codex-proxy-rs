@@ -7,9 +7,14 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'modules/ui'
       - 'modules/ui/**'
-      - 'deploy/**'
+      - '.gitmodules'
+      - 'deploy/Dockerfile'
+      - 'deploy/Dockerfile.dockerignore'
       - 'release/version.yaml'
+      - '.github/scripts/release-metadata.rb'
+      - '.github/scripts/toolchains.rb'
       - '.github/workflows/docker.yml'
   workflow_dispatch:
 
@@ -43,10 +48,18 @@ jobs:
         with:
           version: 10.18.2
 
+      - name: Read build toolchains
+        id: toolchains
+        run: ruby .github/scripts/toolchains.rb >> "$GITHUB_OUTPUT"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ steps.toolchains.outputs.node }}
+          cache: pnpm
+          cache-dependency-path: |
+            modules/ui/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
 
       - name: Build UI library & Frontend
         run: |
@@ -58,7 +71,30 @@ jobs:
           pnpm build
 
       - name: Set up Docker Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v3
+
+      # 层缓存不包含 cache mount，需单独保存 Cargo 下载与编译产物
+      - name: Restore Cargo build cache
+        id: cargo_cache
+        uses: actions/cache@v4
+        with:
+          path: .buildkit-cache
+          key: cargo-linux-amd64-v1-${{ hashFiles('backend/rust-toolchain.toml', 'backend/Cargo.lock', 'deploy/Dockerfile') }}-${{ github.sha }}
+          restore-keys: |
+            cargo-linux-amd64-v1-${{ hashFiles('backend/rust-toolchain.toml', 'backend/Cargo.lock', 'deploy/Dockerfile') }}-
+
+      - name: Inject and extract Cargo cache mounts
+        uses: reproducible-containers/buildkit-cache-dance@5b81f4d29dc8397a7d341dba3aeecc7ec54d6361 # v3.3.0
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-map: |
+            {
+              ".buildkit-cache/registry": "/usr/local/cargo/registry",
+              ".buildkit-cache/git": "/usr/local/cargo/git",
+              ".buildkit-cache/target": "/app/backend/target"
+            }
+          skip-extraction: ${{ steps.cargo_cache.outputs.cache-hit == 'true' }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -102,5 +138,5 @@ jobs:
             CPR_GIT_SHA=${{ github.sha }}
             CPR_BUILD_TIME=${{ steps.build_meta.outputs.build_time }}
             CPR_BUILD_TYPE=release
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=personal-runtime-amd64
+          cache-to: type=gha,scope=personal-runtime-amd64,mode=max
