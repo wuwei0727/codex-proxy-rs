@@ -51,13 +51,13 @@
       "viewLongContextBillingDetails": "查看长上下文计费明细",
       "viewCostDetails": "查看费用明细"
     },
-    "ttft": "TTFT",
+    "ttft": "首字",
     "latency": {
       "totalLatency": "总耗时",
       "viewLatencyDetails": "查看延迟明细",
       "official": "官方",
       "local": "本地",
-      "total": "总耗时"
+      "total": "耗时"
     },
     "performance": {
       "ttftHelp": "TTFT：首个 Token 耗时",
@@ -200,7 +200,10 @@
       "recordsDescription": "成功请求与失败请求记录",
       "noRequestsMatchTheseFilters": "所选条件下暂无请求记录",
       "viewErrorDetails": "查看错误详情",
-      "viewUsageRecordDetails": "查看使用记录详情"
+      "viewUsageRecordDetails": "查看使用记录详情",
+      "viewModeLabel": "视图模式",
+      "recordsTab": "请求明细",
+      "insightsTab": "图表洞察"
     },
     "summary": {
       "usageSummary": "用量汇总",
@@ -360,7 +363,7 @@
     "successfulRequestAverage": "成功请求平均值",
     "usageOverview": "使用概览",
     "noUsageRecords": "暂无使用记录",
-"transportDirection": "上游 {upstream} · 接入 {client}",
+    "transportDirection": "上游 {upstream} · 接入 {client}",
     "accountDisplay": {
       "full": "完整",
       "masked": "脱敏",
@@ -369,4 +372,3 @@
     }
   }
 }
-

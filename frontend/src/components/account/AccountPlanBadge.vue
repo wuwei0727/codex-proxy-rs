@@ -26,6 +26,9 @@ const planPalettes: Record<string, string> = {
   free: 'bg-z-cyan-container text-z-cyan-on-container',
   plus: 'bg-z-blue-container-strong text-z-blue-on-container',
   pro: 'bg-z-purple-container-strong text-z-purple-on-container',
+  pro_20x: 'bg-z-purple-container-strong text-z-purple-on-container',
+  pro20x: 'bg-z-purple-container-strong text-z-purple-on-container',
+  '20x': 'bg-z-purple-container-strong text-z-purple-on-container',
   prolite: 'bg-z-purple-container text-z-purple-on-container',
   pro_5x: 'bg-z-purple-container text-z-purple-on-container',
   promax: 'bg-z-purple-container-strong text-z-purple-on-container ring-1 ring-z-purple-border/50',
@@ -35,6 +38,11 @@ const planPalettes: Record<string, string> = {
 }
 
 const PLAN_DISPLAY_ALIASES: Record<string, string> = {
+  pro: 'Pro 20x',
+  pro_20x: 'Pro 20x',
+  'pro-20x': 'Pro 20x',
+  pro20x: 'Pro 20x',
+  '20x': 'Pro 20x',
   prolite: 'Pro 5x',
   pro_lite: 'Pro 5x',
   'pro-lite': 'Pro 5x',

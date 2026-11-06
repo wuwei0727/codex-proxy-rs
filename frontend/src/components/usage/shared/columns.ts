@@ -104,8 +104,8 @@ export const usageRecordColumns = computed(() => (defineTableColumns<UsageListRe
     key: "accountPlanType",
     label: t("usage.fields.subscription"),
     kind: "status",
-    width: 68,
-    minWidth: 54,
+    width: 78,
+    minWidth: 64,
     fixedWidth: true,
   },
   {

@@ -200,7 +200,10 @@
       "recordsDescription": "Successful and failed request records",
       "noRequestsMatchTheseFilters": "No requests match these filters",
       "viewErrorDetails": "View error details",
-      "viewUsageRecordDetails": "View usage record details"
+      "viewUsageRecordDetails": "View usage record details",
+      "viewModeLabel": "View Mode",
+      "recordsTab": "Request Log",
+      "insightsTab": "Charts & Insights"
     },
     "summary": {
       "usageSummary": "Usage summary",
@@ -360,7 +363,7 @@
     "successfulRequestAverage": "Successful requests only",
     "usageOverview": "Usage overview",
     "noUsageRecords": "No usage records",
-"transportDirection": "Upstream {upstream} · Client {client}",
+    "transportDirection": "Upstream {upstream} · Client {client}",
     "accountDisplay": {
       "full": "Full",
       "masked": "Masked",
@@ -369,4 +372,3 @@
     }
   }
 }
-

@@ -25,21 +25,21 @@ const latencyTones = {
 </script>
 
 <template>
-  <div class="flex max-w-full min-w-0 items-center justify-end gap-1 overflow-hidden">
+  <div class="flex w-full min-w-0 items-center justify-between gap-1 overflow-hidden">
     <div
-      class="grid grid-cols-[auto_auto] items-center justify-end gap-x-1.5 gap-y-1 whitespace-nowrap font-mono text-z-sm leading-none font-heavy tabular-nums shrink-0"
+      class="grid grid-cols-[auto_1fr] items-baseline gap-x-2 gap-y-1 whitespace-nowrap font-mono text-z-sm leading-none font-heavy tabular-nums text-left min-w-0"
     >
-      <span class="text-z-xs text-z-text-quaternary">{{ t('usage.ttft') }}</span>
-      <span :class="latencyDetails.firstOutputSeverity === null ? 'text-z-text-quaternary' : latencyTones[latencyDetails.firstOutputSeverity]">
+      <span class="text-z-xs text-z-text-quaternary cursor-help text-left shrink-0" :title="t('usage.performance.ttftHelp')">{{ t('usage.ttft') }}</span>
+      <span class="text-left font-mono tabular-nums truncate" :class="latencyDetails.firstOutputSeverity === null ? 'text-z-text-quaternary' : latencyTones[latencyDetails.firstOutputSeverity]">
         {{ latencyDetails.firstOutputDisplay }}
       </span>
-      <span class="text-z-xs text-z-text-quaternary">{{ t('usage.latency.total') }}</span>
-      <span :class="latencyDetails.totalSeverity === null ? 'text-z-text-quaternary' : latencyTones[latencyDetails.totalSeverity]">
+      <span class="text-z-xs text-z-text-quaternary text-left shrink-0">{{ t('usage.latency.total') }}</span>
+      <span class="text-left font-mono tabular-nums truncate" :class="latencyDetails.totalSeverity === null ? 'text-z-text-quaternary' : latencyTones[latencyDetails.totalSeverity]">
         {{ latencyDetails.totalDisplay }}
       </span>
     </div>
 
-    <UsageDetailPopover :trigger-label="t('usage.latency.viewLatencyDetails')">
+    <UsageDetailPopover class="shrink-0" :trigger-label="t('usage.latency.viewLatencyDetails')">
       <section
         v-for="(section, index) in latencyDetails.sections"
         :key="section.title"

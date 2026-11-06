@@ -2,8 +2,9 @@
 import type { TableColumn } from '@codex-proxy/ui'
 
 import type { UsageListRecord, UsageRecordStatus } from '@/api'
-import { useTableColumns, ZCard, ZDatePicker, ZIconButton, ZPageHeader, ZPagination, ZTableColumnSettings } from '@codex-proxy/ui'
-import { Eye } from '@lucide/vue'
+import { useTableColumns, ZCard, ZDatePicker, ZIconButton, ZPageHeader, ZPagination, ZSegmented, ZTableColumnSettings } from '@codex-proxy/ui'
+import { ChartNoAxesColumn, Eye, FileText } from '@lucide/vue'
+import { useLocalStorage } from '@vueuse/core'
 
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -23,6 +24,21 @@ import { useUsageTimeRange } from './composables/useUsageTimeRange'
 import { isErrorUsageRecord } from './utils/detail'
 
 const { t } = useI18n({ useScope: 'global' })
+
+type UsageTab = 'records' | 'insights'
+const activeTab = useLocalStorage<UsageTab>('codex-proxy-usage-active-tab', 'records')
+const tabOptions = computed(() => ([
+  {
+    label: t('usage.page.recordsTab'),
+    value: 'records',
+    icon: FileText,
+  },
+  {
+    label: t('usage.page.insightsTab'),
+    value: 'insights',
+    icon: ChartNoAxesColumn,
+  },
+]))
 
 const recordView = shallowRef<UsageRecordStatus>('success')
 const recordColumns = computed<TableColumn<UsageListRecord>[]>(() => recordView.value === 'error'
@@ -104,8 +120,19 @@ watch(timeRange, () => {
       </template>
     </ZPageHeader>
 
+    <div class="mt-4 flex items-center justify-between gap-3">
+      <ZSegmented
+        v-model="activeTab"
+        :options="tabOptions"
+        :aria-label="t('usage.page.viewModeLabel')"
+        size="default"
+      />
+    </div>
+
     <UsageSummaryCards :summary="summary.data" :error="summary.error" />
+
     <UsageInsightsGrid
+      v-if="activeTab === 'insights'"
       v-model:diagnostic-dimension="diagnosticDimension"
       v-model:performance-metric="performanceMetric"
       v-model:cost-metric="costMetric"
@@ -116,6 +143,7 @@ watch(timeRange, () => {
     />
 
     <ZCard
+      v-if="activeTab === 'records'"
       class="mt-5 flex flex-col"
     >
       <template #header>
