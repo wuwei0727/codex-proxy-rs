@@ -13,7 +13,9 @@ export function useAccountDisplayMode() {
   const isFull = computed(() => accountDisplayMode.value === 'full')
 
   function toggle() {
-    accountDisplayMode.value = accountDisplayMode.value === 'masked' ? 'full' : 'masked'
+    accountDisplayMode.value = accountDisplayMode.value === 'masked'
+      ? 'full'
+      : 'masked'
   }
 
   function setMode(mode: AccountDisplayMode) {

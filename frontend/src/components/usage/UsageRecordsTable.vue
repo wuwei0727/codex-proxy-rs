@@ -4,12 +4,9 @@ import type { TableColumn } from '@codex-proxy/ui'
 import type { UsageListRecord } from '@/api'
 import { ZTable } from '@codex-proxy/ui'
 
-import { computed } from 'vue'
 import { Copy } from '@lucide/vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useCopyText } from '@/composables/useCopyText'
-import { useAccountDisplayMode } from '@/composables/useAccountDisplayMode'
-import { maskAccountText } from '@/utils/mask'
 import AccountPlanBadge from '@/components/account/AccountPlanBadge.vue'
 import ProviderIconGroup from '@/components/ProviderIconGroup.vue'
 import UsageBillingCell from '@/components/usage/UsageBillingCell.vue'
@@ -23,6 +20,9 @@ import UsageRouteCell from '@/components/usage/UsageRouteCell.vue'
 import UsageTimeCell from '@/components/usage/UsageTimeCell.vue'
 import UsageTokenCell from '@/components/usage/UsageTokenCell.vue'
 import UsageTransportBadge from '@/components/usage/UsageTransportBadge.vue'
+import { useAccountDisplayMode } from '@/composables/useAccountDisplayMode'
+import { useCopyText } from '@/composables/useCopyText'
+import { maskAccountText } from '@/utils/mask'
 import {
   usageAccountDisplayText,
   usageAccountText,
@@ -56,10 +56,8 @@ const expandedRowKeys = computed(() => {
 function handleCopyUserAgent(ua?: string | null) {
   if (!ua)
     return
-  copyText(ua, { successText: t('common.messages.copied') })
+  copyText(ua)
 }
-
-
 </script>
 
 <template>

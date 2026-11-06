@@ -2,10 +2,10 @@ const EMAIL_TOKEN_REGEX = /[^\s/\\()[\]{}<>:;"',]+@[^\s/\\()[\]{}<>:;"',]+/g
 
 export function maskEmailLike(value: string): string {
   const trimmed = value.trim()
-  const match = trimmed.match(/^([^@\s]{1,3})[^@\s]*@(.+)$/)
+  const match = trimmed.match(/^([^@\s]+)@(.+)$/)
   if (!match)
     return trimmed
-  return `${match[1]}***@${match[2]}`
+  return `${match[1].slice(0, 3)}***@${match[2]}`
 }
 
 function splitFileExtension(value: string) {
@@ -33,7 +33,7 @@ export function maskAccountText(value?: string | null): string {
     return maskedEmailText
 
   // 2. 如果包含标准 API Key 格式（如 sk-..., sess-..., ghp_...）
-  const apiKeyMatch = trimmed.match(/^(sk-proj-[A-Za-z0-9-_]{6,}|sk-ant-[A-Za-z0-9-_]{6,}|sk-[A-Za-z0-9-_]{6,}|sess-[A-Za-z0-9-_]{6,})/i)
+  const apiKeyMatch = trimmed.match(/^(sk-proj-[\w-]{6,}|sk-ant-[\w-]{6,}|sk-[\w-]{6,}|sess-[\w-]{6,})/i)
   if (apiKeyMatch) {
     const key = apiKeyMatch[0]
     const prefix = key.slice(0, 4)

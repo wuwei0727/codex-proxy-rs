@@ -94,7 +94,9 @@ export function usageAccountDisplayText(
   displayMode: AccountDisplayMode = 'full',
 ) {
   const full = usageAccountText(record)
-  return displayMode === 'masked' ? maskAccountText(full) : full
+  return displayMode === 'masked'
+    ? maskAccountText(full)
+    : full
 }
 
 export function usageClientIp(record: { clientIp?: string | null }) {

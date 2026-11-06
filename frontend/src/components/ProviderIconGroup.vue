@@ -54,7 +54,9 @@ const authenticationLabel = computed(() => formatAuthenticationLabel(props.authe
 const providerLabel = computed(() => {
   if (props.hideAuthenticationKind && props.authenticationKind) {
     const auth = authenticationLabel.value
-    return auth ? `${baseProviderLabel.value} · ${auth}` : baseProviderLabel.value
+    return auth
+      ? `${baseProviderLabel.value} · ${auth}`
+      : baseProviderLabel.value
   }
   return baseProviderLabel.value
 })

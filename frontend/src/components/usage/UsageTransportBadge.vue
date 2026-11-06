@@ -61,7 +61,9 @@ const displayTransport = computed(() => {
 // 悬浮完整提示文案
 const tooltip = computed(() => {
   if (!isDualMode.value) {
-    return single.value ? usageTransportFullLabel(single.value) : undefined
+    return single.value
+      ? usageTransportFullLabel(single.value)
+      : undefined
   }
   const clientLabel = usageTransportFullLabel(client.value)
   const upstreamLabel = usageTransportFullLabel(upstream.value)

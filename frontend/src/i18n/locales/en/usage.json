@@ -115,7 +115,6 @@
       "cost": "Cost",
       "latency": "Latency",
       "time": "Time",
-      "keyName": "Key",
       "subscription": "Plan",
       "platformType": "Provider",
       "transport": "Transport"
@@ -363,7 +362,6 @@
     "successfulRequestAverage": "Successful requests only",
     "usageOverview": "Usage overview",
     "noUsageRecords": "No usage records",
-    "transportDirection": "Upstream {upstream} · Client {client}",
     "accountDisplay": {
       "full": "Full",
       "masked": "Masked",

@@ -115,7 +115,6 @@
       "cost": "費用",
       "latency": "延遲",
       "time": "時間",
-      "keyName": "密鑰名稱",
       "subscription": "訂閱",
       "platformType": "平臺",
       "transport": "傳輸"
@@ -363,7 +362,6 @@
     "successfulRequestAverage": "成功請求平均值",
     "usageOverview": "使用概覽",
     "noUsageRecords": "暫無使用記錄",
-    "transportDirection": "上游 {upstream} · 接入 {client}",
     "accountDisplay": {
       "full": "完整",
       "masked": "脫敏",

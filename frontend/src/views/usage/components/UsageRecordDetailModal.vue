@@ -18,8 +18,8 @@ import {
   usageTransportType,
   usageUserAgent,
 } from '@/components/usage/shared/presenter'
-import { useChartPalette } from '@/composables/useChartPalette'
 import { useAccountDisplayMode } from '@/composables/useAccountDisplayMode'
+import { useChartPalette } from '@/composables/useChartPalette'
 
 import { formatDuration, formatInteger } from '@/utils/format'
 import { attemptOutcomeClass, attemptOutcomeText, displayValue, fieldLabelClass, fieldValueBaseClass, visibleRequestText, visibleResponseText } from '../utils/detail'

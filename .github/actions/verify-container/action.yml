@@ -81,6 +81,7 @@ runs:
         sudo install -d -m 0770 -o "$(id -u)" -g 10001 \
           .runtime/data .runtime/logs
         ruby <<'RUBY'
+        require "yaml"
         path = "deploy/config.example.yaml"
         content = File.read(path)
         replacements = {
@@ -92,6 +93,14 @@ runs:
           raise "missing config placeholder: #{placeholder}" unless content.sub!(placeholder, configured)
         end
         File.write("deploy/config.yaml", content)
+        # 安装器也直接读取此文件，CI 工作区统一使用随项目创建和回收的网络
+        compose_path = "deploy/compose.yaml"
+        compose = YAML.load_file(compose_path, aliases: true)
+        compose.fetch("networks").fetch("cpa_default").merge!(
+          "name" => "#{ENV.fetch("COMPOSE_PROJECT_NAME")}_cpa",
+          "external" => false,
+        )
+        File.write(compose_path, YAML.dump(compose))
         RUBY
         sudo chown "$(id -u):10001" deploy/config.yaml
         chmod 0640 deploy/config.yaml
@@ -144,8 +153,9 @@ runs:
         compose=(docker compose --project-name "$COMPOSE_PROJECT_NAME" \
           -f deploy/compose.yaml)
         "${compose[@]}" up -d --no-build --wait codex-proxy-rs
+        address="$("${compose[@]}" port codex-proxy-rs 8080)"
         status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-          "http://127.0.0.1:8080/healthz")"
+          "http://${address}/healthz")"
         test "$status" = 204
         test "$("${compose[@]}" exec -T codex-proxy-rs id -u | tr -d '\r')" = 10001
         test "$("${compose[@]}" exec -T codex-proxy-rs id -g | tr -d '\r')" = 10001
