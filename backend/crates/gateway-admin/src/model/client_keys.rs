@@ -120,6 +120,7 @@ pub struct ClientKeyRecord {
     pub limits: RateLimits,
     pub budget: ClientBudgetStatus,
     pub last_used_at: Option<DateTime<Utc>>,
+    pub last_model_request_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

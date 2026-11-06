@@ -197,6 +197,9 @@ watch(
             <template #lastUsedAt="{ row }">
               <LastUsedAtCell :value="row.lastUsedAt" :full-display="row.lastUsedAtFullDisplay" />
             </template>
+            <template #lastModelRequestAt="{ row }">
+              <LastUsedAtCell :value="row.lastModelRequestAt" :full-display="row.lastModelRequestAtFullDisplay" />
+            </template>
             <template #actions="{ row }">
               <ApiKeyActions
                 :api-key="row"

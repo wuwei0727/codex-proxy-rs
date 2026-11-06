@@ -453,6 +453,7 @@ fn client_key_responses_should_keep_shape_and_redact_creation_debug() {
             created_at,
             updated_at: created_at,
             last_used_at: Some(created_at),
+            last_model_request_at: Some(created_at),
         },
         gateway_api::TimePresenter::new(Default::default()),
     ));
@@ -477,6 +478,15 @@ fn client_key_responses_should_keep_shape_and_redact_creation_debug() {
                 .expect("serialized last-used timestamp")
         )
         .expect("parse serialized last-used timestamp"),
+        created_at.fixed_offset()
+    );
+    assert_eq!(
+        DateTime::parse_from_rfc3339(
+            list["items"][0]["lastModelRequestAt"]
+                .as_str()
+                .expect("serialized last-model-request timestamp")
+        )
+        .expect("parse serialized last-model-request timestamp"),
         created_at.fixed_offset()
     );
     assert!(list["items"][0].get("plaintextKey").is_none());

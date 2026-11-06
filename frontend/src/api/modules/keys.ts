@@ -41,6 +41,8 @@ export interface ApiKey {
   lastUsedAt: string | null
   lastUsedAtDisplay: string
   lastUsedAtFullDisplay: string | null
+  lastModelRequestAt: string | null
+  lastModelRequestAtFullDisplay: string | null
   routingScope: ApiKeyRoutingScope
   groups: AccountGroupRef[]
   providerKinds: string[]

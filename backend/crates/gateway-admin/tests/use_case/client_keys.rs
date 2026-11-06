@@ -108,6 +108,7 @@ impl ClientKeyStore for TestClientKeyStore {
             limits: key.limits,
             budget: Default::default(),
             last_used_at: None,
+            last_model_request_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -247,6 +248,7 @@ async fn plugin_client_key_list_projects_only_public_identity_and_uses_stable_na
                 limits: RateLimits::unlimited(),
                 budget: Default::default(),
                 last_used_at: Some(now),
+                last_model_request_at: None,
                 created_at: now,
                 updated_at: now,
             }],

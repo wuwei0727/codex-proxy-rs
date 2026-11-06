@@ -1100,6 +1100,7 @@ impl ClientKeyStore for MemoryClientKeyStore {
                 enabled: true,
                 limits: RateLimits::unlimited(),
                 last_used_at: None,
+                last_model_request_at: None,
                 created_at: now,
                 updated_at: now,
             },

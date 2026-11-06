@@ -89,7 +89,8 @@
       "keyPrefix": "Prefix",
       "quotaUsage": "Quota",
       "requestLimits": "Limits",
-      "lastUsed": "Last used"
+      "lastUsed": "Last authenticated",
+      "lastModelRequest": "Recent model request (retained)"
     },
     "page": {
       "description": "Manage API keys and account access",

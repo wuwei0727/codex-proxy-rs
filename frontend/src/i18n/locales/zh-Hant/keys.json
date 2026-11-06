@@ -89,7 +89,8 @@
       "keyPrefix": "密鑰前綴",
       "quotaUsage": "額度使用",
       "requestLimits": "請求限制",
-      "lastUsed": "最後使用"
+      "lastUsed": "最後認證",
+      "lastModelRequest": "最近模型請求（保留期內）"
     },
     "page": {
       "description": "管理 API密鑰及賬號訪問範圍",

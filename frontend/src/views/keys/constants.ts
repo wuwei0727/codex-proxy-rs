@@ -58,6 +58,13 @@ export const apiKeyColumns = computed(() => (defineTableColumns<ApiKey>([
     emptyText: '',
   },
   {
+    key: 'lastModelRequestAt',
+    label: t('keys.fields.lastModelRequest'),
+    kind: 'datetime',
+    size: 'md',
+    emptyText: '',
+  },
+  {
     key: 'actions',
     label: t('common.fields.actions'),
     kind: 'actions',

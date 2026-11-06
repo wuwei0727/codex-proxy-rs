@@ -26,6 +26,68 @@ use gateway_store::postgres::{
 use super::TestDatabase;
 
 #[tokio::test]
+async fn last_model_request_uses_retained_history_and_is_distinct_from_authentication() {
+    let Some(database) = TestDatabase::create("client_key_last_model_request").await else {
+        return;
+    };
+    sqlx::query("insert into client_api_keys (id,name,key,created_at,updated_at,last_used_at) values ('key_last_model','last_model',$1,now(),now(),'2026-11-05T14:05:07Z')")
+        .bind(format!("sk_{}", "a".repeat(43)))
+        .execute(&database.pool).await.expect("seed key");
+    let repository = PgClientApiKeyRepository::new(database.pool.clone());
+    assert!(
+        repository
+            .get_client_api_key("key_last_model")
+            .await
+            .expect("read key")
+            .expect("key exists")
+            .last_model_request_at
+            .is_none()
+    );
+
+    for (id, started_at) in [
+        ("request_newer", "2026-11-05T11:13:52Z"),
+        ("request_older", "2026-11-05T10:00:00Z"),
+    ] {
+        sqlx::query("insert into model_requests (id,client_api_key_ref,operation,client_transport,started_at,recovery_lease_expires_at,outcome,completed_at,request_observation_json) values ($1,'key_last_model','responses','http_sse',$2::timestamptz,$2::timestamptz + interval '1 hour','failed',$2::timestamptz + interval '1 minute',jsonb_build_object('request',jsonb_build_object('configRevision',1,'protocol','openai','endpoint','/v1/responses','compact',false),'routing',jsonb_build_object('scope','all','groupRefs','{}'::text[],'groupNamesSnapshot','[]'::jsonb)))")
+            .bind(id).bind(started_at).execute(&database.pool).await.expect("seed request");
+    }
+    let expected = chrono::DateTime::parse_from_rfc3339("2026-11-05T11:13:52Z")
+        .expect("timestamp")
+        .with_timezone(&Utc);
+    let detail = repository
+        .get_client_api_key("key_last_model")
+        .await
+        .expect("read key")
+        .expect("key exists");
+    assert_eq!(detail.last_model_request_at, Some(expected));
+    let page = repository
+        .list_client_api_keys(ClientApiKeyListQuery {
+            cursor: None,
+            page_size: 10,
+            search: Some("last_model".to_owned()),
+            sort: ClientApiKeySort::default(),
+        })
+        .await
+        .expect("list keys");
+    assert_eq!(page.items[0].last_model_request_at, Some(expected));
+
+    sqlx::query("delete from model_requests where client_api_key_ref='key_last_model'")
+        .execute(&database.pool)
+        .await
+        .expect("simulate retention");
+    assert!(
+        repository
+            .get_client_api_key("key_last_model")
+            .await
+            .expect("read key")
+            .expect("key exists")
+            .last_model_request_at
+            .is_none()
+    );
+    database.close().await;
+}
+
+#[tokio::test]
 async fn peer_sharing_persists_across_reads_and_cannot_lose_its_group_scope() {
     use gateway_admin::{
         model::{

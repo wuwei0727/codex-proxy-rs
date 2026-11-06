@@ -370,6 +370,8 @@ pub struct ClientKeyView {
     last_used_at: Option<DateTime<Utc>>,
     last_used_at_display: String,
     last_used_at_full_display: Option<String>,
+    last_model_request_at: Option<DateTime<Utc>>,
+    last_model_request_at_full_display: Option<String>,
 }
 
 impl From<(ClientKeyRecord, crate::time::TimePresenter)> for ClientKeyView {
@@ -433,6 +435,11 @@ impl From<(ClientKeyRecord, crate::time::TimePresenter)> for ClientKeyView {
                 .as_ref()
                 .map(|value| time.datetime(value)),
             last_used_at: record.last_used_at,
+            last_model_request_at_full_display: record
+                .last_model_request_at
+                .as_ref()
+                .map(|value| time.datetime(value)),
+            last_model_request_at: record.last_model_request_at,
         }
     }
 }

@@ -39,6 +39,7 @@ pub(super) async fn fixture() -> AdminTestFixture {
             weekly_resets_at: Some((now + Duration::days(7)).into()),
         },
         last_used_at: Some(now),
+        last_model_request_at: None,
         created_at: now,
         updated_at: now,
     });

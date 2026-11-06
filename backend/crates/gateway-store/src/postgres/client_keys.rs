@@ -133,6 +133,7 @@ pub struct ClientApiKeyRecord {
     pub requests_per_minute: u64,
     pub budget: ClientBudgetStatus,
     pub last_used_at: Option<DateTime<Utc>>,
+    pub last_model_request_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -388,7 +389,8 @@ impl ClientApiKeyRepository for PgClientApiKeyRepository {
         let mut statement = QueryBuilder::<Postgres>::new(
             "select k.id, k.name, k.label, k.peer_sharing_json, k.provider_request_profiles_json as request_profile_overrides,
                     left(k.key, least(10, length(k.key) / 2)) as prefix, k.enabled,
-                    k.max_concurrency, k.requests_per_minute, k.last_used_at, k.created_at,
+                    k.max_concurrency, k.requests_per_minute, k.last_used_at,
+                    (select mr.started_at from model_requests mr where mr.client_api_key_ref = k.id order by mr.started_at desc, mr.id desc limit 1) as last_model_request_at, k.created_at,
                     k.updated_at, '[]'::jsonb as groups, '{}'::text[] as provider_kinds
              from client_api_keys k
              where true",
@@ -448,7 +450,8 @@ impl ClientApiKeyRepository for PgClientApiKeyRepository {
         let record = sqlx::query(
             "select k.id, k.name, k.label, k.peer_sharing_json, k.provider_request_profiles_json as request_profile_overrides,
                     left(k.key, least(10, length(k.key) / 2)) as prefix, k.enabled,
-                    k.max_concurrency, k.requests_per_minute, k.last_used_at, k.created_at,
+                    k.max_concurrency, k.requests_per_minute, k.last_used_at,
+                    (select mr.started_at from model_requests mr where mr.client_api_key_ref = k.id order by mr.started_at desc, mr.id desc limit 1) as last_model_request_at, k.created_at,
                     k.updated_at, coalesce(groups.groups, '[]'::jsonb) as groups,
                     case
                       when groups.binding_count = 0 then coalesce(
@@ -1146,6 +1149,7 @@ fn admin_client_key_record(record: ClientApiKeyRecord) -> AdminStoreResult<Admin
         },
         budget: record.budget,
         last_used_at: record.last_used_at,
+        last_model_request_at: record.last_model_request_at,
         created_at: record.created_at,
         updated_at: record.updated_at,
     })
@@ -1502,6 +1506,9 @@ fn client_record_from_row(row: &sqlx::postgres::PgRow) -> StoreResult<ClientApiK
             last_used_at: row
                 .try_get("last_used_at")
                 .map_err(|source| invalid("invalid last used at").with_source(source))?,
+            last_model_request_at: row
+                .try_get("last_model_request_at")
+                .map_err(|source| invalid("invalid last model request at").with_source(source))?,
             created_at: row
                 .try_get("created_at")
                 .map_err(|source| invalid("invalid created at").with_source(source))?,

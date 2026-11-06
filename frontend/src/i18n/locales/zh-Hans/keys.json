@@ -89,7 +89,8 @@
       "keyPrefix": "密钥前缀",
       "quotaUsage": "额度使用",
       "requestLimits": "请求限制",
-      "lastUsed": "最后使用"
+      "lastUsed": "最后认证",
+      "lastModelRequest": "最近模型请求（保留期内）"
     },
     "page": {
       "description": "管理 API密钥及账号访问范围",
