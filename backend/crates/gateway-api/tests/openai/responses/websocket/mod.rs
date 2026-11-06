@@ -303,6 +303,7 @@ fn response_create_should_reject_non_boolean_stream_without_disclosing_body_valu
 
 #[derive(Default)]
 struct AtomicFailureTrace {
+    event_gate: Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
     starts: AtomicUsize,
     next_calls: AtomicUsize,
     committed: AtomicBool,
@@ -330,6 +331,10 @@ impl ExecutionSession for AtomicFailureSession {
     fn next_event(&mut self) -> BoxFuture<'_, Result<Option<CoordinatedEvent>, EngineError>> {
         Box::pin(async move {
             let next_call = self.trace.next_calls.fetch_add(1, Ordering::AcqRel);
+            let gate = self.trace.event_gate.lock().unwrap().take();
+            if let Some(gate) = gate {
+                let _ = gate.await;
+            }
             if let Some(error) = self.trace.initial_errors.lock().unwrap().pop_front() {
                 self.trace.finalized.store(true, Ordering::Release);
                 return Err(error);
@@ -1312,4 +1317,226 @@ async fn websocket_upgrade_should_reject_malformed_handshakes() {
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
+}
+
+#[tokio::test]
+async fn idle_websocket_does_not_block_request_drain_or_start_new_work() {
+    use tower::ServiceExt;
+    let trace = Arc::new(AtomicFailureTrace::default());
+    let app = api_router(Arc::new(AtomicFailureExecution {
+        client: authenticated_client("sk_ws_atomic"),
+        trace,
+        response_headers: Vec::new(),
+        fail_before_first_event: false,
+    }))
+    .await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let serving = app.clone();
+    let server = tokio::spawn(async move { axum::serve(listener, serving).await.unwrap() });
+    let mut request = format!("ws://{address}/v1/responses")
+        .into_client_request()
+        .unwrap();
+    request
+        .headers_mut()
+        .insert(AUTHORIZATION, "Bearer sk_ws_atomic".parse().unwrap());
+    let (mut socket, _) = connect_async(request).await.unwrap();
+    let drained = app
+        .oneshot(
+            Request::builder()
+                .uri("/internal/drain")
+                .method("POST")
+                .extension(axum::extract::ConnectInfo(
+                    "127.0.0.1:1234".parse::<std::net::SocketAddr>().unwrap(),
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(drained.status(), StatusCode::OK);
+    let status: Value = serde_json::from_slice(
+        &axum::body::to_bytes(drained.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(status["activeRequests"], 0);
+    socket
+        .send(ClientMessage::Text(
+            json!({"type":"response.create","model":"model-a","input":"hello"})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+    let frame = tokio::time::timeout(Duration::from_secs(2), socket.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert!(
+        matches!(frame, ClientMessage::Close(_)),
+        "draining connection must not execute new work"
+    );
+    server.abort();
+}
+
+#[tokio::test]
+async fn request_drain_waits_for_active_websocket_turn() {
+    use tower::ServiceExt;
+    let (release, gate) = tokio::sync::oneshot::channel();
+    let trace = Arc::new(AtomicFailureTrace {
+        event_gate: Mutex::new(Some(gate)),
+        ..Default::default()
+    });
+    let app = api_router(Arc::new(AtomicFailureExecution {
+        client: authenticated_client("sk_ws_atomic"),
+        trace: trace.clone(),
+        response_headers: Vec::new(),
+        fail_before_first_event: false,
+    }))
+    .await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let serving = app.clone();
+    let server = tokio::spawn(async move { axum::serve(listener, serving).await.unwrap() });
+    let mut request = format!("ws://{address}/v1/responses")
+        .into_client_request()
+        .unwrap();
+    request
+        .headers_mut()
+        .insert(AUTHORIZATION, "Bearer sk_ws_atomic".parse().unwrap());
+    let (mut socket, _) = connect_async(request).await.unwrap();
+    socket
+        .send(ClientMessage::Text(
+            json!({"type":"response.create","model":"model-a","input":"hello"})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while trace.next_calls.load(Ordering::Acquire) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let status = |method| {
+        let app = app.clone();
+        async move {
+            let response = app
+                .oneshot(
+                    Request::builder()
+                        .uri("/internal/drain")
+                        .method(method)
+                        .extension(axum::extract::ConnectInfo(
+                            "127.0.0.1:1234".parse::<std::net::SocketAddr>().unwrap(),
+                        ))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            serde_json::from_slice::<Value>(
+                &axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap(),
+            )
+            .unwrap()
+        }
+    };
+    assert_eq!(status("POST").await["activeRequests"], 1);
+    release.send(()).unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if status("GET").await["activeRequests"] == 0 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    socket.close(None).await.ok();
+    server.abort();
+}
+
+#[tokio::test]
+async fn request_drain_tracks_http_stream_until_delivery_finishes() {
+    use tower::ServiceExt;
+    let (release, gate) = tokio::sync::oneshot::channel();
+    let trace = Arc::new(AtomicFailureTrace {
+        event_gate: Mutex::new(Some(gate)),
+        ..Default::default()
+    });
+    let app = api_router(Arc::new(AtomicFailureExecution {
+        client: authenticated_client("sk_ws_atomic"),
+        trace: trace.clone(),
+        response_headers: Vec::new(),
+        fail_before_first_event: false,
+    }))
+    .await;
+    let serving = app.clone();
+    let request_task = tokio::spawn(async move {
+        let response = serving
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/responses")
+                    .method("POST")
+                    .header(AUTHORIZATION, "Bearer sk_ws_atomic")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"model":"model-a","input":"hello","stream":true}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap()
+    });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while trace.next_calls.load(Ordering::Acquire) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let status = |method| {
+        let app = app.clone();
+        async move {
+            let response = app
+                .oneshot(
+                    Request::builder()
+                        .uri("/internal/drain")
+                        .method(method)
+                        .extension(axum::extract::ConnectInfo(
+                            "127.0.0.1:1234".parse::<std::net::SocketAddr>().unwrap(),
+                        ))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            serde_json::from_slice::<Value>(
+                &axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap(),
+            )
+            .unwrap()
+        }
+    };
+    assert_eq!(status("POST").await["activeRequests"], 1);
+    release.send(()).unwrap();
+    let body = tokio::time::timeout(Duration::from_secs(2), request_task)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(!body.is_empty());
+    assert_eq!(status("GET").await["activeRequests"], 0);
 }

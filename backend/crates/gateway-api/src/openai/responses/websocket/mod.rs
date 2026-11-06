@@ -224,6 +224,13 @@ async fn serve_responses_websocket(socket: Socket, session: ResponsesWebSocketSe
             expire_connection(&mut connection).await;
             break;
         }
+        // 与排空切换原子互斥，旧 WS 不能在摘流后启动下一次任务
+        let Some(_request_guard) = service.activity().enter() else {
+            connection
+                .close_policy("Node is draining. Reconnect to retry.", None)
+                .await;
+            break;
+        };
         let correlation_id = Arc::<str>::from(service.next_request_id());
         if !is_response_create(&payload) {
             if send_control(

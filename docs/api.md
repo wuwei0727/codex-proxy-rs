@@ -208,6 +208,9 @@ Dashboard 的 `lastUsedRelative` 和账号额度的 `refreshedAtRelative` 由后
 
 两个接口均返回空正文。探针并行执行，共用 2 秒截止时间
 
+容器内运维可直连 `/internal/drain`：`GET` 查询、`POST` 开始排空、`DELETE` 恢复接纳，返回 `{"draining":false,"activeRequests":0}`。仅允许真实 socket 为回环地址且不带 Origin、Forwarded 或 X-Forwarded-For 的请求，其余返回 `403`。该状态只属于本进程，不是全局账号槽位；排空时新数据面 HTTP 请求返回 `503`，旧 Responses WebSocket 下一次任务会被关闭，已有任务继续执行。健康探针保持原有语义，排空与路由切换由运维脚本协调
+
+
 ## 3. OpenAI 数据面与模型目录
 
 除下述入站解压保护外，Responses、Chat Completions、Images 和 standalone Search HTTP body、

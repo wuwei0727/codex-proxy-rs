@@ -122,6 +122,9 @@ async fn open_sideband(
         Ok(guard) => guard,
         Err(_) => return runtime_unavailable_response().into_response(),
     };
+    let Some(activity_guard) = service.activity().enter() else {
+        return runtime_unavailable_response().into_response();
+    };
     let cancellation = service.lifecycle().cancellation();
     let opening = gateway.open_sideband(LiveSidebandRequest {
         call_id: &call_id,
@@ -142,7 +145,13 @@ async fn open_sideband(
             return super::http::live_gateway_error_response(LiveErrorShape::Realtime, &error);
         }
     };
-    serve_sideband(upgrade, relay, connection_guard, cancellation)
+    serve_sideband(
+        upgrade,
+        relay,
+        connection_guard,
+        activity_guard,
+        cancellation,
+    )
 }
 
 fn upgrade_required_response() -> Response {
@@ -163,6 +172,7 @@ fn serve_sideband(
     mut upgrade: WebSocketUpgrade,
     relay: LiveRelay,
     connection_guard: Box<dyn ConnectionGuard>,
+    activity_guard: crate::drain::RequestGuard,
     cancellation: CancellationToken,
 ) -> Response {
     // 上游已按客户端 offer 协商子协议；只有客户端确实 offer 过才会命中。
@@ -173,6 +183,7 @@ fn serve_sideband(
         .max_message_size(usize::MAX)
         .max_frame_size(usize::MAX)
         .on_upgrade(move |socket| async move {
+            let _activity_guard = activity_guard;
             relay_sideband(socket, relay, connection_guard, cancellation).await;
         })
 }

@@ -1,4 +1,5 @@
 """验证更新失败时不重建其他节点、不把故障节点恢复进流量池。"""
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -22,6 +23,7 @@ class RollingTests(unittest.TestCase):
         item.workers = Mock(return_value={1: 'start'})
         item.configure = Mock()
         item.wait_drain = Mock()
+        item.request_activity = Mock(return_value=None)
         item.recreate = Mock()
         return item
 
@@ -168,6 +170,77 @@ class RollingTests(unittest.TestCase):
         with patch('rolling_update.run', side_effect=['', config, 'new', 'new', '3.41.0']):
             item.update()
         item.update_node.assert_not_called()
+
+
+    def test_idle_request_count_skips_tcp_wait(self):
+        item = Updater('/unused', '/unused', drain=60)
+        item.request_activity = Mock(return_value={'draining': True, 'activeRequests': 0})
+        item.target_connections = Mock(side_effect=AssertionError('must not count idle sockets'))
+        with patch('rolling_update.time.sleep') as sleep:
+            self.assertEqual(item.wait_drain(18081, 'node2'), 0)
+            sleep.assert_not_called()
+
+    def test_request_drain_releases_when_stream_finishes(self):
+        item = Updater('/unused', '/unused', drain=60)
+        item.request_activity = Mock(side_effect=[
+            {'draining': True, 'activeRequests': 1},
+            {'draining': True, 'activeRequests': 0},
+        ])
+        with patch('rolling_update.time.sleep'):
+            self.assertEqual(item.wait_drain(18081, 'node2'), 0)
+        self.assertEqual(item.request_activity.call_count, 2)
+
+    def test_request_probe_failure_resumes_admission_before_routing(self):
+        item = self.updater()
+        item.request_activity.side_effect = [
+            {'draining': False, 'activeRequests': 1},
+            {'draining': True, 'activeRequests': 1},
+            {'draining': False, 'activeRequests': 1},
+        ]
+        item.wait_drain.side_effect = RuntimeError('probe failed')
+        with self.assertRaisesRegex(RuntimeError, 'probe failed'):
+            item.update_node('node2', 18081, 'image', 'version', CONFIG)
+        self.assertEqual(item.request_activity.call_args.args, ('node2', 'DELETE'))
+        self.assertEqual(item.configure.call_args.args, (CONFIG,))
+        item.recreate.assert_not_called()
+
+    def test_legacy_only_falls_back_on_explicit_missing_endpoint(self):
+        item = Updater('/unused', '/unused')
+        for response in ['not found\n404\ntext/plain', '<html>old</html>\n200\ntext/html', '\n404\n']:
+            with patch('rolling_update.run', return_value=response + '\nCPR_DRAIN_END'):
+                self.assertIsNone(item.request_activity('node2'))
+        for response in ['bad\n500\ntext/plain', '{}\n200\napplication/json',
+                         '{"draining":true,"activeRequests":true}\n200\napplication/json']:
+            with patch('rolling_update.run', return_value=response + '\nCPR_DRAIN_END'):
+                with self.assertRaises(RuntimeError):
+                    item.request_activity('node2')
+
+
+    def test_empty_legacy_body_preserves_curl_status_through_runner(self):
+        item = Updater('/unused', '/unused')
+        for output in ['\n404\n\nCPR_DRAIN_END', '\n404\ntext/plain\nCPR_DRAIN_END', 'not found\n404\n\nCPR_DRAIN_END']:
+            result = subprocess.CompletedProcess([], 0, stdout=output, stderr='')
+            with patch('rolling_update.subprocess.run', return_value=result):
+                self.assertIsNone(item.request_activity('node2'))
+
+    def test_failed_resume_keeps_target_out_of_rotation(self):
+        item = self.updater()
+        item.request_activity.side_effect = [
+            {'draining': False, 'activeRequests': 1},
+            {'draining': True, 'activeRequests': 1},
+            RuntimeError('resume failed'),
+        ]
+        item.wait_drain.side_effect = RuntimeError('probe failed')
+        with self.assertRaisesRegex(RuntimeError, 'resume failed'):
+            item.update_node('node2', 18081, 'image', 'version', CONFIG)
+        item.configure.assert_called_once_with(disabled_config(CONFIG, 18081))
+        item.recreate.assert_not_called()
+
+    def test_active_request_timeout_is_bounded(self):
+        item = Updater('/unused', '/unused', drain=60)
+        item.request_activity = Mock(return_value={'draining': True, 'activeRequests': 2})
+        with patch('rolling_update.time.monotonic', side_effect=[0, 60]):
+            self.assertEqual(item.wait_drain(18081, 'node2'), 2)
 
 
 if __name__ == '__main__':

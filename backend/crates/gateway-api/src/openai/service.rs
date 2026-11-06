@@ -25,21 +25,27 @@ use super::responses::{ContinuationIntent, DecodedResponsesRequest};
 pub(crate) struct OpenAiService {
     execution: Arc<dyn ExecutionService>,
     lifecycle: Arc<dyn ConnectionLifecycle>,
+    activity: crate::drain::RequestActivity,
 }
 
 impl OpenAiService {
+    pub(crate) fn activity(&self) -> &crate::drain::RequestActivity {
+        &self.activity
+    }
+
     pub(crate) fn execution(&self) -> Arc<dyn ExecutionService> {
         Arc::clone(&self.execution)
     }
 
     #[must_use]
-    pub(crate) const fn new(
+    pub(crate) fn new(
         execution: Arc<dyn ExecutionService>,
         lifecycle: Arc<dyn ConnectionLifecycle>,
     ) -> Self {
         Self {
             execution,
             lifecycle,
+            activity: crate::drain::RequestActivity::default(),
         }
     }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""双节点更新：摘流、限时等待目标连接、重建并验证，失败时保留可用节点。"""
+"""双节点更新：摘流、限时等待目标请求、重建并验证，失败时保留可用节点。"""
 import argparse
 import json
 import os
@@ -13,12 +13,12 @@ import urllib.request
 import urllib.error
 
 
-def run(*args):
+def run(*args, strip=True):
     result = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode:
         # Compose 输出可能含配置，不把完整配置或环境打印到日志
         raise RuntimeError(f"命令失败（{result.returncode}）：{' '.join(args[:3])}")
-    return result.stdout.strip()
+    return result.stdout.strip() if strip else result.stdout
 
 
 def disabled_config(text, port):
@@ -116,20 +116,49 @@ class Updater:
                      f'dst 127.0.0.1 and dport = :{port}')
         return len(output.splitlines())
 
-    def wait_drain(self, port):
+    def request_activity(self, service, method='GET'):
+        output = run(*self.compose, 'exec', '-T', service, 'curl',
+                     '--silent', '--show-error', '--max-time', '4', '--noproxy', '*',
+                     '-X', method, '-w', '\n%{http_code}\n%{content_type}\nCPR_DRAIN_END',
+                     'http://127.0.0.1:8080/internal/drain', strip=False)
+        try:
+            body, status, content_type, marker = output.rsplit('\n', 3)
+            if marker != 'CPR_DRAIN_END':
+                raise ValueError('incomplete probe response')
+            # 旧版本未知路由可能返回 SPA 首页；仅 GET 的明确旧版响应允许回退
+            if method == 'GET' and (status == '404' or (status == '200' and content_type.startswith('text/html'))):
+                return None
+            if status != '200' or not content_type.startswith('application/json'):
+                raise ValueError('unexpected response')
+            state = json.loads(body)
+            count = state['activeRequests']
+            if type(count) is not int or count < 0 or type(state['draining']) is not bool:
+                raise ValueError('invalid activity')
+            return state
+        except (ValueError, KeyError, TypeError) as error:
+            raise RuntimeError('节点请求状态探测失败，不能视为无请求') from error
+
+    def wait_drain(self, port, service=None):
         deadline = time.monotonic() + self.drain_timeout
         report = 0
         while True:
-            remaining = self.target_connections(port)
+            if service is None:
+                remaining = self.target_connections(port)
+            else:
+                state = self.request_activity(service)
+                if state is None or not state['draining']:
+                    raise RuntimeError('节点排空状态丢失，停止更新')
+                remaining = state['activeRequests']
+            unit = '活动请求' if service else 'TCP 连接（旧版兼容）'
             if remaining == 0:
-                print(f'节点 {port} 连接已排空', flush=True)
+                print(f'节点 {port} {unit}已排空', flush=True)
                 return 0
             now = time.monotonic()
             if now >= deadline:
-                print(f'节点 {port} 排空等待到期，剩余 {remaining} 条连接；继续重建，未完成请求可能中断，客户端需重连或重试', flush=True)
+                print(f'节点 {port} 排空等待到期，剩余 {remaining} 个{unit}；继续重建，未完成请求可能中断，客户端需重连或重试', flush=True)
                 return remaining
             if now >= report:
-                print(f'等待节点 {port} 的 {remaining} 条连接，最多再等 {max(1, int(deadline - now))} 秒', flush=True)
+                print(f'等待节点 {port} 的 {remaining} 个{unit}，最多再等 {max(1, int(deadline - now))} 秒', flush=True)
                 report = now + 10
             time.sleep(1)
 
@@ -147,7 +176,11 @@ class Updater:
             self.container(service)
             if not self.healthy(port):
                 raise RuntimeError(f'{service} 不健康，请先恢复双节点，再执行滚动更新')
-            self.target_connections(port)
+            state = self.request_activity(service)
+            if state is None:
+                self.target_connections(port)
+            elif state['draining']:
+                raise RuntimeError(f'{service} 已处于排空状态，请先检查并恢复')
         config = run('nginx', '-T')
         if re.search(r'^\s*worker_shutdown_timeout\s+', config, re.M):
             raise RuntimeError('worker_shutdown_timeout 会强制关闭旧连接，请先检查 Nginx 配置')
@@ -174,8 +207,18 @@ class Updater:
             raise RuntimeError('另一节点不健康，停止更新')
         self.configure(disabled_config(original, port))
         changed = False
+        drain_attempted = False
         try:
-            self.wait_drain(port)
+            activity = self.request_activity(service)
+            if activity is not None:
+                drain_attempted = True
+                state = self.request_activity(service, 'POST')
+                if not state['draining']:
+                    raise RuntimeError('节点未进入排空状态')
+                self.wait_drain(port, service)
+            else:
+                print(f'{service} 尚不支持请求计数，本次使用 TCP 限时等待；升级后生效', flush=True)
+                self.wait_drain(port)
             if not self.healthy(other):
                 raise RuntimeError('另一节点已不健康，停止更新')
             changed = True
@@ -196,6 +239,10 @@ class Updater:
             raise RuntimeError(f'{service} 启动检查超时')
         except BaseException:
             if not changed:
+                if drain_attempted:
+                    state = self.request_activity(service, 'DELETE')
+                    if state['draining']:
+                        raise RuntimeError('无法恢复请求接纳，节点保持摘流')
                 self.configure(original)
             else:
                 print(f'{service} 保持摘流，另一节点继续服务；检查日志并人工恢复，禁止继续更新另一节点', flush=True)
@@ -204,7 +251,7 @@ class Updater:
     def update(self, check=False):
         original = self.preflight()
         if check:
-            print('预检通过：双节点健康、Nginx 配置及目标连接可检查；未修改服务')
+            print('预检通过：双节点健康、Nginx 配置及排空探测正常；未修改服务')
             return
         run(*self.compose, 'pull', *(s for s, _ in self.nodes))
         config = json.loads(run(*self.compose, 'config', '--format', 'json'))

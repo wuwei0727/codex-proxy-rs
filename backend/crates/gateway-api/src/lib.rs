@@ -31,6 +31,7 @@ pub mod admin;
 pub mod auth;
 mod client_error;
 mod diagnostics;
+mod drain;
 mod health;
 mod key_usage;
 mod middleware;
@@ -219,8 +220,15 @@ pub fn initialize(
     let mut router = Router::new()
         .route("/readyz", get(health::readyz))
         .route("/healthz", get(health::healthz))
-        .merge(openai::router::router())
-        .merge(provider::router())
+        .route(
+            "/internal/drain",
+            get(drain::control)
+                .post(drain::control)
+                .delete(drain::control),
+        )
+        .merge(openai::router::router().merge(provider::router()).layer(
+            axum::middleware::from_fn_with_state(state.clone(), drain::track_http),
+        ))
         .merge(admin::router::<ApiState>())
         .merge(admin::model_router())
         .merge(auth::router::<ApiState>())
