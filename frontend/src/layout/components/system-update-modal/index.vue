@@ -25,6 +25,7 @@ import { notification as ZNotification } from '@/utils/notification'
 import { errorMessage } from '@/utils/operation'
 import DockerUpdatePanel from './DockerUpdatePanel.vue'
 import {
+  dockerBuildStatusLabel,
   resolveSystemUpdateLogClasses,
   resolveSystemUpdatePresentation,
 } from './presenter'
@@ -161,7 +162,7 @@ async function handleCheckUpdates(force = true) {
     }
     ZNotification.success({
       message: data?.docker
-        ? t(`systemUpdate.docker.states.${data.docker.status}`)
+        ? dockerBuildStatusLabel(data.docker.status)
         : data?.hasUpdate
           ? t('systemUpdate.feedback.available')
           : t('systemUpdate.feedback.noUpdates'),
@@ -293,7 +294,7 @@ watch(
   <ZDialog
     v-model="open"
     :title="t('systemUpdate.title')"
-    :description="t(isDocker ? 'systemUpdate.docker.description' : 'systemUpdate.description')"
+    :description="isDocker ? t('systemUpdate.docker.description') : t('systemUpdate.description')"
     type="success"
     width="48rem"
     :show-close="!restarting" :close-on-click-modal="!restarting" :close-on-press-escape="!restarting"

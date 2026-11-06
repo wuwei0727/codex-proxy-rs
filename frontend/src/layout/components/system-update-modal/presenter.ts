@@ -1,4 +1,4 @@
-import type { SystemUpdateDetail, SystemVersion } from '@/api'
+import type { DockerUpdateDetail, SystemUpdateDetail, SystemVersion } from '@/api'
 import { ArrowUpCircle, CheckCircle2, RefreshCw, XCircle } from '@lucide/vue'
 import { t } from '@/i18n'
 
@@ -170,4 +170,15 @@ function displayValue(value: unknown) {
   return value
     ? String(value)
     : '-'
+}
+
+export function dockerBuildStatusLabel(status: DockerUpdateDetail['status']) {
+  const labels = {
+    current: t('systemUpdate.docker.states.current'),
+    available: t('systemUpdate.docker.states.available'),
+    ahead: t('systemUpdate.docker.states.ahead'),
+    unknown: t('systemUpdate.docker.states.unknown'),
+    no_build: t('systemUpdate.docker.states.no_build'),
+  }
+  return labels[status]
 }

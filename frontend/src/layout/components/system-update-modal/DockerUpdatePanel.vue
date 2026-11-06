@@ -4,6 +4,7 @@ import { ZMarkdown, ZSkeleton } from '@codex-proxy/ui'
 import { ExternalLink } from '@lucide/vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { dockerBuildStatusLabel } from './presenter'
 
 const props = defineProps<{
   detail: SystemUpdateDetail | null
@@ -27,7 +28,7 @@ const state = computed(() => props.error || props.detail?.warning
           {{ t('systemUpdate.docker.mine') }}
         </h3>
         <span class="rounded-full px-2.5 py-1 text-z-xs font-bold" :class="state === 'available' ? 'bg-z-success-container text-z-success-on-container' : 'bg-z-fill-tertiary text-z-text-secondary'">
-          {{ loading ? t('systemUpdate.status.checkingVersion') : t(`systemUpdate.docker.states.${state}`) }}
+          {{ loading ? t('systemUpdate.status.checkingVersion') : dockerBuildStatusLabel(state) }}
         </span>
       </header>
       <a v-if="docker?.repository" :href="`https://github.com/${docker.repository}`" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 break-all text-z-sm text-z-link hover:text-z-link-hover">
