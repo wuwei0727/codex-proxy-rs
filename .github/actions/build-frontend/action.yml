@@ -24,6 +24,16 @@ runs:
         cache: pnpm
         cache-dependency-path: frontend/pnpm-lock.yaml
 
+    # Fork 从本地子模块消费 UI，先准备其产物供 file 依赖安装
+    - name: Build local UI dependency
+      shell: bash
+      run: |
+        if node -e 'process.exit(require("./frontend/package.json").dependencies["@codex-proxy/ui"] === "file:../modules/ui" ? 0 : 1)'; then
+          git submodule update --init modules/ui
+          pnpm --dir modules/ui install --no-frozen-lockfile
+          pnpm --dir modules/ui build
+        fi
+
     - name: Install frontend dependencies
       shell: bash
       run: pnpm --dir frontend install --frozen-lockfile
@@ -43,4 +53,4 @@ runs:
         name: frontend-dist
         path: frontend/dist
         if-no-files-found: error
-        retention-days: 1
+        retention-days: 7
