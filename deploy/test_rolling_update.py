@@ -36,7 +36,7 @@ class RollingTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 disabled_config(text, 18081)
 
-    def test_drain_timeout_restores_routing_without_rebuild(self):
+    def test_drain_probe_failure_restores_routing_without_rebuild(self):
         item = self.updater()
         item.wait_drain.side_effect = RuntimeError('busy')
         with self.assertRaisesRegex(RuntimeError, 'busy'):
@@ -88,12 +88,54 @@ class RollingTests(unittest.TestCase):
                     item.configure(disabled_config(CONFIG, 18081))
             self.assertEqual(path.read_text(), CONFIG)
 
-    def test_old_worker_timeout_does_not_kill_process(self):
-        item = Updater('/unused', '/unused', drain=1)
+    def test_target_connection_count_uses_only_destination_port(self):
+        item = Updater('/unused', '/unused')
+        with patch('rolling_update.run', return_value='0 0 127.0.0.1:40000 127.0.0.1:18081\n0 0 127.0.0.1:40001 127.0.0.1:18081') as command:
+            self.assertEqual(item.target_connections(18081), 2)
+        self.assertIn('dst 127.0.0.1 and dport = :18081', command.call_args.args)
+
+    def test_empty_target_ignores_old_nginx_workers(self):
+        item = Updater('/unused', '/unused')
         item.workers = Mock(return_value={1: 'start'})
+        item.target_connections = Mock(return_value=0)
+        self.assertEqual(item.wait_drain(18081), 0)
+        item.workers.assert_not_called()
+
+    def test_ss_failure_is_not_treated_as_empty(self):
+        item = Updater('/unused', '/unused')
+        with patch('rolling_update.run', side_effect=RuntimeError('ss failed')):
+            with self.assertRaisesRegex(RuntimeError, 'ss failed'):
+                item.wait_drain(18081)
+
+    def test_connections_finish_before_deadline(self):
+        item = Updater('/unused', '/unused')
+        item.target_connections = Mock(side_effect=[2, 1, 0])
+        with patch('rolling_update.time.sleep'):
+            self.assertEqual(item.wait_drain(18081), 0)
+
+    def test_connection_timeout_returns_remaining_without_killing_nginx(self):
+        item = Updater('/unused', '/unused', drain=1)
+        item.target_connections = Mock(return_value=2)
         with patch('rolling_update.time.monotonic', side_effect=[0, 2]):
-            with self.assertRaisesRegex(RuntimeError, '旧连接'):
-                item.wait_drain({1: 'start'})
+            self.assertEqual(item.wait_drain(18081), 2)
+
+    def test_timeout_continues_rebuild(self):
+        item = self.updater()
+        item.wait_drain.return_value = 2
+        item.container = Mock(return_value={'Id': 'cid', 'Image': 'image'})
+        item.ready_timeout = 100
+        with patch('rolling_update.run', return_value='3.41.0'), patch('rolling_update.time.sleep'):
+            item.update_node('node2', 18081, 'image', '3.41.0', CONFIG)
+        item.wait_drain.assert_called_once_with(18081)
+        item.recreate.assert_called_once_with('node2', 'image')
+
+    def test_other_node_fails_during_drain(self):
+        item = self.updater()
+        item.healthy.side_effect = [True, False]
+        with self.assertRaisesRegex(RuntimeError, '另一节点'):
+            item.update_node('node2', 18081, 'image', '3.41.0', CONFIG)
+        item.recreate.assert_not_called()
+        self.assertEqual(item.configure.call_args.args, (CONFIG,))
 
     def test_external_config_change_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:

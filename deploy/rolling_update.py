@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""双节点更新：摘流、等待旧连接、重建并验证，失败时保留可用节点。"""
+"""双节点更新：摘流、限时等待目标连接、重建并验证，失败时保留可用节点。"""
 import argparse
 import json
 import os
@@ -42,7 +42,7 @@ def disabled_config(text, port):
 class Updater:
     nodes = [('codex-proxy-rs-2', 18081), ('codex-proxy-rs', 18080)]
 
-    def __init__(self, install, nginx, drain=600, ready=300):
+    def __init__(self, install, nginx, drain=60, ready=300):
         self.install = Path(install)
         self.nginx = Path(nginx).resolve()
         self.drain_timeout, self.ready_timeout = drain, ready
@@ -110,15 +110,27 @@ class Updater:
             run('nginx', '-s', 'reload')
             raise
 
-    def wait_drain(self, old_workers):
+    def target_connections(self, port):
+        # 只统计通向目标节点的宿主 TCP 连接，不等待其他站点或 TIME_WAIT
+        output = run('ss', '-Hnt', 'state', 'established',
+                     f'dst 127.0.0.1 and dport = :{port}')
+        return len(output.splitlines())
+
+    def wait_drain(self, port):
         deadline = time.monotonic() + self.drain_timeout
         report = 0
-        while set(old_workers.items()) & set(self.workers().items()):
-            if time.monotonic() >= deadline:
-                raise RuntimeError('旧连接未结束，取消更新，不强制关闭连接')
-            if time.monotonic() >= report:
-                print('等待旧 Nginx worker 完成连接；其他站点长连接也可能延长等待', flush=True)
-                report = time.monotonic() + 30
+        while True:
+            remaining = self.target_connections(port)
+            if remaining == 0:
+                print(f'节点 {port} 连接已排空', flush=True)
+                return 0
+            now = time.monotonic()
+            if now >= deadline:
+                print(f'节点 {port} 排空等待到期，剩余 {remaining} 条连接；继续重建，未完成请求可能中断，客户端需重连或重试', flush=True)
+                return remaining
+            if now >= report:
+                print(f'等待节点 {port} 的 {remaining} 条连接，最多再等 {max(1, int(deadline - now))} 秒', flush=True)
+                report = now + 10
             time.sleep(1)
 
     def container(self, service):
@@ -135,6 +147,7 @@ class Updater:
             self.container(service)
             if not self.healthy(port):
                 raise RuntimeError(f'{service} 不健康，请先恢复双节点，再执行滚动更新')
+            self.target_connections(port)
         config = run('nginx', '-T')
         if re.search(r'^\s*worker_shutdown_timeout\s+', config, re.M):
             raise RuntimeError('worker_shutdown_timeout 会强制关闭旧连接，请先检查 Nginx 配置')
@@ -159,11 +172,10 @@ class Updater:
         other = 18080 if port == 18081 else 18081
         if not self.healthy(other):
             raise RuntimeError('另一节点不健康，停止更新')
-        old = self.workers()
         self.configure(disabled_config(original, port))
         changed = False
         try:
-            self.wait_drain(old)
+            self.wait_drain(port)
             if not self.healthy(other):
                 raise RuntimeError('另一节点已不健康，停止更新')
             changed = True
@@ -192,7 +204,7 @@ class Updater:
     def update(self, check=False):
         original = self.preflight()
         if check:
-            print('预检通过：双节点健康、Nginx 配置及 worker 可检查；未修改服务')
+            print('预检通过：双节点健康、Nginx 配置及目标连接可检查；未修改服务')
             return
         run(*self.compose, 'pull', *(s for s, _ in self.nodes))
         config = json.loads(run(*self.compose, 'config', '--format', 'json'))
@@ -218,7 +230,7 @@ def main():
     args = parser.parse_args()
     install = os.environ.get('CPR_INSTALL_DIR', '/opt/codex-proxy-rs')
     nginx = os.environ.get('CPR_NGINX_CONFIG', '/etc/nginx/sites-available/cpr.ranran0112.ccwu.cc')
-    drain = int(os.environ.get('CPR_DRAIN_TIMEOUT', '600'))
+    drain = int(os.environ.get('CPR_DRAIN_TIMEOUT', '60'))
     ready = int(os.environ.get('CPR_READY_TIMEOUT', '300'))
     if min(drain, ready) <= 0:
         raise RuntimeError('等待时间必须为正整数')
