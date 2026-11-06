@@ -105,6 +105,25 @@
       "docker": "Docker",
       "binary": "Binary",
       "source": "From source"
+    },
+    "docker": {
+      "mine": "My deployment",
+      "running": "Running version / commit",
+      "latestBuild": "Latest successful build",
+      "channel": "Image channel",
+      "upstream": "Upstream releases",
+      "home": "Upstream repository",
+      "copyCommand": "Copy update command",
+      "help": "After the image build succeeds, run cpr update on the server to roll out both nodes. This page does not download or install application packages.",
+      "upstreamHelp": "For review and manual merging only. Upstream releases do not update your deployment.",
+      "states": {
+        "current": "Latest build installed",
+        "available": "New image build available",
+        "ahead": "Running commit ahead of build",
+        "unknown": "Update status unknown",
+        "no_build": "No successful build"
+      },
+      "description": "Check your image builds and upstream releases"
     }
   }
 }

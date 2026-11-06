@@ -105,6 +105,25 @@
       "docker": "Docker",
       "binary": "二进制",
       "source": "源码运行"
+    },
+    "docker": {
+      "mine": "我的部署",
+      "running": "运行版本 / 提交",
+      "latestBuild": "最新成功构建",
+      "channel": "镜像通道",
+      "upstream": "上游动态",
+      "home": "官方仓库",
+      "copyCommand": "复制更新命令",
+      "help": "镜像构建成功后，在服务器执行 cpr update 滚动更新两个节点。这里不会下载或安装程序包。",
+      "upstreamHelp": "仅供查看和手动合并，上游发布不会直接更新你的部署。",
+      "states": {
+        "current": "已是最新构建",
+        "available": "有新镜像构建",
+        "ahead": "运行提交领先于构建",
+        "unknown": "暂无法确认更新",
+        "no_build": "暂无成功构建"
+      },
+      "description": "检查自己的镜像构建，查看上游版本动态"
     }
   }
 }

@@ -196,6 +196,7 @@ impl SystemOperations for ProgressSystem {
     ) -> Result<SystemUpdateDetail, SystemOperationError> {
         use gateway_admin::model::system::{SystemUpdateChannel, SystemUpdatePolicy};
         Ok(SystemUpdateDetail {
+            docker: None,
             policy: SystemUpdatePolicy {
                 channel: channel.unwrap_or(SystemUpdateChannel::Stable),
                 available_channels: vec![SystemUpdateChannel::Stable, SystemUpdateChannel::Beta],

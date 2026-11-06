@@ -54,7 +54,9 @@ impl ReleaseCache {
         refresh: bool,
         channel: UpdateChannel,
     ) -> Result<SystemUpdateDetail, OperationError> {
-        if let Some(reason) = config.update_support_error() {
+        if config.deployment_mode != "docker"
+            && let Some(reason) = config.update_support_error()
+        {
             return Ok(base_update_detail(config, channel, Some(reason), None));
         }
         let repository = config
@@ -68,19 +70,25 @@ impl ReleaseCache {
             return Ok(detail);
         }
         let sequence = self.request_sequence.fetch_add(1, Ordering::Relaxed) + 1;
-        match fetch_latest(
-            &config.github_api_base,
-            repository,
-            &config.version,
-            channel,
-        )
-        .await
-        {
-            Ok(release) => {
-                let detail = release.as_ref().map_or_else(
+        let result = if config.deployment_mode == "docker" {
+            super::docker::detail(config, channel).await
+        } else {
+            fetch_latest(
+                &config.github_api_base,
+                repository,
+                &config.version,
+                channel,
+            )
+            .await
+            .map(|release| {
+                release.as_ref().map_or_else(
                     || base_update_detail(config, channel, config.update_support_error(), None),
                     |release| detail_from_release(config, release, channel),
-                );
+                )
+            })
+        };
+        match result {
+            Ok(detail) => {
                 let mut entry = self.entry.lock().await;
                 // 较慢的旧请求不能覆盖或清除新检查的结果，包括切走再切回同一通道
                 if self.request_sequence.load(Ordering::Relaxed) == sequence {
@@ -174,7 +182,7 @@ fn eligible_release_version(
     .then_some(version)
 }
 
-async fn fetch_release_json<T: serde::de::DeserializeOwned>(
+pub(super) async fn fetch_release_json<T: serde::de::DeserializeOwned>(
     client: &reqwest::Client,
     url: &str,
 ) -> Result<T, OperationError> {
@@ -211,6 +219,7 @@ pub(crate) fn detail_from_release(
         return base_update_detail(config, channel, unsupported_reason, None);
     }
     SystemUpdateDetail {
+        docker: None,
         policy: update_policy(config, channel),
         current_version: config.version.clone(),
         latest_version,
@@ -481,6 +490,9 @@ fn url_host_is_loopback(url: &reqwest::Url) -> bool {
 
 impl SystemUpdateConfig {
     pub(super) fn update_support_error(&self) -> Option<String> {
+        if self.deployment_mode == "docker" {
+            return Some("Docker 部署请在服务器执行 cpr update，禁止在线替换程序包".to_owned());
+        }
         if !matches!(self.build_type.as_str(), "release" | "experimental") {
             return Some("在线更新需要官方发布构建".to_owned());
         }
@@ -539,6 +551,7 @@ pub(super) fn base_update_detail(
     warning: Option<String>,
 ) -> SystemUpdateDetail {
     SystemUpdateDetail {
+        docker: None,
         policy: update_policy(config, channel),
         current_version: config.version.clone(),
         latest_version: config.version.clone(),

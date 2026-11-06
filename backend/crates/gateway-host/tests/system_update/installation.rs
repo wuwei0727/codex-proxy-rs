@@ -32,18 +32,19 @@ async fn manual_image_replacement_should_clear_pending_state_and_invalid_backup(
         Some(TARGET_VERSION)
     );
     assert!(
-        redeployed
+        !redeployed
             .update_detail(true, None)
             .await
             .expect("check")
             .has_update
     );
-    assert_eq!(
-        complete_update(&redeployed, TARGET_VERSION)
+    assert!(
+        redeployed
+            .perform_test_update(Some(TARGET_VERSION.to_owned()))
             .await
-            .operation
-            .status,
-        SystemOperationStatus::Succeeded
+            .unwrap_err()
+            .message()
+            .contains("cpr update")
     );
 }
 

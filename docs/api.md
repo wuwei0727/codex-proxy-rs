@@ -2786,6 +2786,15 @@ Provider metadata 分别保留 `requestedServiceTier` 与 `upstreamServiceTier` 
 | `GET` | `/api/admin/system/restart/check` | 无 | 只读检查重启目标与启用插件 |
 | `POST` | `/api/admin/system/restart` | `{ confirmation? }` | 复核兼容性风险确认并重启，保留插件启用配置 |
 
+Docker 部署的详情新增 `docker`，非 Docker 时为 `null`。字段包括 `repository`、`currentSha`、
+`latestSha`、`buildUrl`、`status`、`upstreamVersion`、`upstreamNotes` 和 `upstreamWarning`。
+`status` 为 `current`、`available`、`ahead`、`unknown` 或 `no_build`，只根据配置仓库
+`main` 分支 `docker.yml` 的成功构建与运行提交关系判断，不使用上游 Release 推断镜像状态。
+Docker 的 `hasUpdate` 表示成功构建提交领先；`updateSupported=false` 表示禁止程序包安装，
+`latestVersion` 保留运行版本，最新构建身份使用 `docker.latestSha`。构建查询失败由 `warning` 返回，
+上游查询失败由 `docker.upstreamWarning` 返回，两者互不影响。Docker 的更新及回滚 POST 返回 `40901`，
+部署通过服务器 `cpr update` 完成。以下 Release 安装语义适用于非 Docker 部署。
+
 在线更新遵循[版本命名与升级规则](../deploy/README.md#版本命名与升级规则)。版本接口的
 `updateChannel` 由当前版本推导，取值为 `stable`、`alpha`、`beta`、`rc`、`exp`，无法识别时为 `unknown`。
 详情接口的可选 `channel` 仅作用于本次查询，不保存实例偏好；省略时按当前运行版本推导。

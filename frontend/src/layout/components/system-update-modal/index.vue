@@ -19,9 +19,11 @@ import { storeToRefs } from 'pinia'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { checkSystemRestart } from '@/api'
+import { useCopyText } from '@/composables/useCopyText'
 import { normalizeSystemVersion, useSystemUpdateStore } from '@/stores/modules/system-update'
 import { notification as ZNotification } from '@/utils/notification'
 import { errorMessage } from '@/utils/operation'
+import DockerUpdatePanel from './DockerUpdatePanel.vue'
 import {
   resolveSystemUpdateLogClasses,
   resolveSystemUpdatePresentation,
@@ -29,6 +31,7 @@ import {
 
 const { t } = useI18n({ useScope: 'global' })
 
+const copyText = useCopyText()
 const open = defineModel<boolean>({ default: false })
 
 const systemUpdateStore = useSystemUpdateStore()
@@ -86,6 +89,8 @@ const updateLogRows = computed(() =>
     classes: resolveSystemUpdateLogClasses(item.level),
   })),
 )
+
+const isDocker = computed(() => (version.value?.deploymentMode ?? updateInfo.value?.deploymentMode) === 'docker')
 
 const channelLabels = computed(() => ({
   stable: {
@@ -155,9 +160,11 @@ async function handleCheckUpdates(force = true) {
       return
     }
     ZNotification.success({
-      message: data?.hasUpdate
-        ? t('systemUpdate.feedback.available')
-        : t('systemUpdate.feedback.noUpdates'),
+      message: data?.docker
+        ? t(`systemUpdate.docker.states.${data.docker.status}`)
+        : data?.hasUpdate
+          ? t('systemUpdate.feedback.available')
+          : t('systemUpdate.feedback.noUpdates'),
     })
   }
   catch {}
@@ -286,7 +293,7 @@ watch(
   <ZDialog
     v-model="open"
     :title="t('systemUpdate.title')"
-    :description="t('systemUpdate.description')"
+    :description="t(isDocker ? 'systemUpdate.docker.description' : 'systemUpdate.description')"
     type="success"
     width="48rem"
     :show-close="!restarting" :close-on-click-modal="!restarting" :close-on-press-escape="!restarting"
@@ -295,7 +302,14 @@ watch(
       <ArrowUpCircle class="size-4.5 text-z-success" />
     </template>
 
-    <div class="grid gap-3.5">
+    <DockerUpdatePanel
+      v-if="isDocker"
+      :detail="updateInfo"
+      :version="version"
+      :loading="loading || checking"
+      :error="updateError"
+    />
+    <div v-else class="grid gap-3.5">
       <section class="grid gap-4 rounded-z-card bg-z-fill-quaternary px-4 py-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
@@ -468,7 +482,7 @@ watch(
     </div>
 
     <template #footer>
-      <div class="mr-auto flex min-w-0 basis-full items-center gap-2 sm:basis-auto">
+      <div v-if="!isDocker" class="mr-auto flex min-w-0 basis-full items-center gap-2 sm:basis-auto">
         <ZSkeleton v-if="loading" class="h-8 w-52" :aria-label="t('systemUpdate.channels.loading')" />
         <ZSegmented
           v-else
@@ -510,7 +524,7 @@ watch(
         {{ t('systemUpdate.actions.check') }}
       </ZButton>
       <ZButton
-        v-if="needRestart"
+        v-if="!isDocker && needRestart"
         type="primary"
         :loading="restarting || checkingRestart"
         :disabled="loading || updating || restartConfirmOpen"
@@ -522,7 +536,7 @@ watch(
         {{ presentation.restartButtonLabel }}
       </ZButton>
       <ZButton
-        v-else-if="hasUpdate || updating"
+        v-else-if="!isDocker && (hasUpdate || updating)"
         type="primary"
         :loading="preparingUpdate || updating"
         :disabled="!canUpdate || preparingUpdate"
@@ -532,6 +546,12 @@ watch(
           <Download class="size-4" />
         </template>
         {{ updating ? t('systemUpdate.status.updating') : t('systemUpdate.actions.install') }}
+      </ZButton>
+      <ZButton v-if="isDocker" type="primary" @click="copyText('cpr update')">
+        <template #icon>
+          <Terminal class="size-4" />
+        </template>
+        {{ t('systemUpdate.docker.copyCommand') }}
       </ZButton>
     </template>
   </ZDialog>

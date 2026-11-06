@@ -383,6 +383,12 @@ async fn restart_should_use_startup_path_after_running_executable_is_renamed() {
 #[tokio::test]
 async fn restart_should_conflict_while_another_system_operation_is_running() {
     let fixture = Fixture::new();
+    fs::copy(
+        env!("CARGO_BIN_EXE_gateway-host-process-worker"),
+        fixture.executable(),
+    )
+    .unwrap();
+    fs::write(fixture.root.path().join("restart-probe"), b"").unwrap();
     // 裸 TCP 监听不回包：update 持有操作锁后停在 release 拉取阶段，accept
     // 信号保证断言时锁一定已被占用
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -398,7 +404,7 @@ async fn restart_should_conflict_while_another_system_operation_is_running() {
     });
     let mut config = fixture.config(&api_base);
     config.self_restart_enabled = true;
-    config.deployment_mode = "docker".to_owned();
+    config.deployment_mode = "binary".to_owned();
     let shutdown = CancellationToken::new();
     let service = Arc::new(ProcessSystemOperations::new(shutdown.clone(), config));
     let update = tokio::spawn({
@@ -432,6 +438,17 @@ async fn restart_should_conflict_while_another_system_operation_is_running() {
         .restart(Arc::new(AllowingUpdatePreflight))
         .await
         .expect("restart after lock release");
+    tokio::time::timeout(Duration::from_secs(2), shutdown.cancelled())
+        .await
+        .unwrap();
+    drop(service);
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !fixture.root.path().join("replacement-ran").exists() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("replacement finishes before fixture cleanup");
 }
 
 #[tokio::test]

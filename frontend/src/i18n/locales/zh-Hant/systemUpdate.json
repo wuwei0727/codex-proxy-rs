@@ -105,6 +105,25 @@
       "docker": "Docker",
       "binary": "二進制",
       "source": "源碼運行"
+    },
+    "docker": {
+      "mine": "我的部署",
+      "running": "運行版本 / 提交",
+      "latestBuild": "最新成功構建",
+      "channel": "鏡像通道",
+      "upstream": "上游動態",
+      "home": "官方倉庫",
+      "copyCommand": "複製更新命令",
+      "help": "鏡像構建成功後，在服務器執行 cpr update 滾動更新兩個節點。這裡不會下載或安裝程序包。",
+      "upstreamHelp": "僅供查看和手動合併，上游發布不會直接更新你的部署。",
+      "states": {
+        "current": "已是最新構建",
+        "available": "有新鏡像構建",
+        "ahead": "運行提交領先於構建",
+        "unknown": "暫無法確認更新",
+        "no_build": "暫無成功構建"
+      },
+      "description": "檢查自己的鏡像構建，查看上游版本動態"
     }
   }
 }

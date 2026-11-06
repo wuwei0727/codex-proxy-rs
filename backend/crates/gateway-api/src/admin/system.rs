@@ -102,6 +102,7 @@ impl From<SystemVersion> for SystemVersionView {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SystemUpdateDetailView {
+    docker: Option<gateway_admin::model::system::DockerUpdateDetail>,
     policy: SystemUpdatePolicy,
     current_version: String,
     latest_version: String,
@@ -123,6 +124,7 @@ impl From<SystemUpdateDetail> for SystemUpdateDetailView {
         Self {
             deployment_mode_label: deployment_mode_label(&detail.deployment_mode).to_owned(),
             build_type_label: build_type_label(&detail.build_type),
+            docker: detail.docker,
             policy: detail.policy,
             current_version: detail.current_version,
             latest_version: detail.latest_version,

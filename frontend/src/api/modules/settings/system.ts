@@ -21,7 +21,19 @@ export interface SystemVersion {
   updateWarning: string | null
 }
 
+export interface DockerUpdateDetail {
+  repository: string
+  currentSha: string
+  latestSha: string | null
+  buildUrl: string | null
+  status: 'current' | 'available' | 'ahead' | 'unknown' | 'no_build'
+  upstreamVersion: string | null
+  upstreamNotes: string | null
+  upstreamWarning: string | null
+}
+
 export interface SystemUpdateDetail {
+  docker: DockerUpdateDetail | null
   policy: SystemUpdatePolicy
   currentVersion: string
   latestVersion: string

@@ -57,6 +57,7 @@ pub struct SystemVersion {
 /// 部署模式与构建类型的展示标签归 API；其余字段均为 Host 已确认的原始事实
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SystemUpdateDetail {
+    pub docker: Option<DockerUpdateDetail>,
     pub policy: SystemUpdatePolicy,
     pub current_version: String,
     pub latest_version: String,
@@ -69,6 +70,30 @@ pub struct SystemUpdateDetail {
     pub update_supported: bool,
     pub unsupported_reason: Option<String>,
     pub warning: Option<String>,
+}
+
+/// Docker 成功构建与上游动态互不作为对方的更新候选
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DockerUpdateDetail {
+    pub repository: String,
+    pub current_sha: String,
+    pub latest_sha: Option<String>,
+    pub build_url: Option<String>,
+    pub status: DockerBuildStatus,
+    pub upstream_version: Option<String>,
+    pub upstream_notes: Option<String>,
+    pub upstream_warning: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DockerBuildStatus {
+    Current,
+    Available,
+    Ahead,
+    Unknown,
+    NoBuild,
 }
 
 /// 系统操作类型

@@ -45,6 +45,7 @@ impl SystemOperations for RecordingSystemOperations {
         _: Option<gateway_admin::model::system::SystemUpdateChannel>,
     ) -> Result<SystemUpdateDetail, SystemOperationError> {
         Ok(SystemUpdateDetail {
+            docker: None,
             policy: gateway_admin::model::system::SystemUpdatePolicy {
                 channel: gateway_admin::model::system::SystemUpdateChannel::Stable,
                 available_channels: vec![gateway_admin::model::system::SystemUpdateChannel::Stable],

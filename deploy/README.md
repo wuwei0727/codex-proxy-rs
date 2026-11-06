@@ -887,6 +887,16 @@ alpha、beta、rc、exp 在 GitHub 标记为 Pre-release，不覆盖 GitHub Late
 
 ### 管理端在线更新
 
+Docker 部署的更新页分为“我的部署”和“上游动态”。“我的部署”查询 `CPR_UPDATE_REPOSITORY` 下
+`main` 分支 `docker.yml` 的最新成功构建，并与运行程序的完整 Git 提交号比较；只有构建提交领先时
+提示有新镜像，提交相同、运行提交领先或历史分叉不会提示升级。查询失败与没有成功构建分别展示。
+成功构建记录不是对 GHCR 当前标签内容的校验，实际部署仍由 `cpr update` 拉取、固定镜像 ID 并核对。
+“上游动态”只展示 `zyycn/codex-proxy-rs` 的最新正式 Release 和链接，供手动合并，不参与自己的更新判断。
+
+Docker 页面只提供检查与复制 `cpr update`，服务端拒绝程序包在线更新及回滚。
+在服务器执行命令完成双节点滚动部署；容器内不挂载 Docker socket，也不从网页执行宿主命令。
+以下程序包安装流程仅适用于非 Docker 部署。
+
 在线更新要求官方构建且起始版本不低于 **v3.18.1**，版本选择遵循上述规则；源码等非官方构建返回不支持原因，不提供可用更新。
 不满足在线更新条件时，使用完整发行包或镜像[手动部署](#镜像升级与源码构建)。
 点击「下载并更新」后，操作日志显示下载、校验与安装过程，完成后显示「待重启」及待生效版本，重启后才使用新程序。
@@ -916,7 +926,7 @@ YAML 中显式配置的值优先于对应环境变量
 
 Compose 提供以下在线更新运行参数：
 
-- `CPR_UPDATE_REPOSITORY`：只接受 `owner/repository`；默认 `zyycn/codex-proxy-rs`
+- `CPR_UPDATE_REPOSITORY`：只接受 `owner/repository`；本分支默认 `wuwei0727/codex-proxy-rs`
 - `CPR_GITHUB_API_BASE`：正式环境必须为 `https://api.github.com/repos`
 - `CPR_UPDATE_EXE_PATH`、`CPR_WEB_DIST_DIR`：分别指向容器内二进制和前端静态目录；
   `CPR_WEB_DIST_DIR` 同时供页面服务与更新器使用，相对路径以 `deploy/config.yaml` 所在目录为基准

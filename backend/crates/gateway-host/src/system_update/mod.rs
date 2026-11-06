@@ -3,6 +3,7 @@
 mod archive;
 mod config;
 mod diagnostics;
+mod docker;
 mod download;
 mod error;
 mod events;

@@ -1,6 +1,7 @@
 //! 系统更新测试入口与发行包、前置校验和本地安装夹具
 
 mod channels;
+mod docker;
 mod download;
 mod events;
 mod installation;

@@ -442,7 +442,9 @@ impl SystemOperations for ProcessSystemOperations {
                 &self.config.update_state_file,
                 &self.config.update_lock_file,
             )?;
-            if self.config.update_support_error().is_none() {
+            if self.config.deployment_mode == "docker"
+                || self.config.update_support_error().is_none()
+            {
                 match OperationFileLock::acquire(&self.config.update_lock_file) {
                     Ok(_lock) => return self.reconcile_installation(),
                     Err(error) if error.kind() == SystemOperationErrorKind::Conflict => {}
