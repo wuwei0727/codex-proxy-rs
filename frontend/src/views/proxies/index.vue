@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { OutboundProxyRecord } from '@/api'
 
-import { ZButton, ZCard, ZCheckbox, ZConfirmDialog, ZInput, ZPageHeader, ZPagination, ZTable, ZTag } from '@codex-proxy/ui'
+import { ZButton, ZCard, ZCheckbox, ZConfirmDialog, ZInput, ZPagination, ZTable, ZTag } from '@codex-proxy/ui'
 import { LockKeyhole, Plus, Search, Users, Wifi } from '@lucide/vue'
 import { shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -67,11 +67,12 @@ watch(search, () => {
 
 <template>
   <div class="flex h-full min-h-0 w-full flex-col overflow-hidden">
-    <ZPageHeader
-      :title="t('navigation.proxies')"
-      :description="t('proxies.page.description')"
-    />
-    <ZCard class="mt-5 flex h-[calc(100dvh-136px)] min-h-125 flex-col">
+    <header class="flex shrink-0 items-center justify-between gap-3">
+      <h1 class="m-0 text-base font-bold tracking-tight text-z-text">
+        {{ t('navigation.proxies') }}
+      </h1>
+    </header>
+    <ZCard class="mt-3 flex h-[calc(100dvh-95px)] min-h-125 flex-col">
       <template #header>
         <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
           <ZInput v-model="search" :disabled="batchTesting" class="sm:w-80" :aria-label="t('proxies.page.searchLabel')" :placeholder="t('proxies.page.searchPlaceholder')">

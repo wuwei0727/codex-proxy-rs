@@ -60,26 +60,30 @@ function overviewIconClass(tone: string) {
 </script>
 
 <template>
-  <div class="mt-5 grid shrink-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-    <ZCard v-for="item in overviewItems" :key="item.label" as="article" padding="compact">
-      <div class="flex items-stretch justify-between gap-3">
-        <div class="flex min-w-0 flex-col">
-          <p class="m-0 text-z-sm leading-none font-heavy text-z-text-secondary">
-            {{ item.label }}
-          </p>
-          <strong class="my-2 block font-mono text-[26px] leading-none font-extrabold text-z-text">
-            {{ item.value }}
-          </strong>
-          <p class="m-0 truncate text-z-sm leading-none font-emphasis text-z-text-quaternary">
-            {{ item.caption }}
-          </p>
-        </div>
-        <ZMotionIcon
-          class="inline-flex size-9 shrink-0 items-center justify-center self-start rounded-lg"
-          :class="overviewIconClass(item.tone)"
-        >
-          <component :is="item.icon" class="size-4.5" />
-        </ZMotionIcon>
+  <div class="mt-3 grid shrink-0 grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+    <ZCard
+      v-for="item in overviewItems"
+      :key="item.label"
+      as="article"
+      padding="none"
+      class="flex items-center gap-3 p-3 transition-colors"
+    >
+      <ZMotionIcon
+        class="inline-flex size-8 shrink-0 items-center justify-center rounded-z"
+        :class="overviewIconClass(item.tone)"
+      >
+        <component :is="item.icon" class="size-4" />
+      </ZMotionIcon>
+      <div class="flex min-w-0 flex-1 flex-col justify-center">
+        <span class="block truncate text-xs font-semibold text-z-text-secondary">
+          {{ item.label }}
+        </span>
+        <strong class="my-0.5 block truncate font-mono text-[19px] leading-tight font-extrabold text-z-text">
+          {{ item.value }}
+        </strong>
+        <span class="block truncate text-[11px] leading-none text-z-text-quaternary" :title="item.caption">
+          {{ item.caption }}
+        </span>
       </div>
     </ZCard>
   </div>

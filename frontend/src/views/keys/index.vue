@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ApiKey } from '@/api'
 
-import { ZCard, ZCheckbox, ZConfirmDialog, ZPageHeader, ZPagination, ZTable } from '@codex-proxy/ui'
+import { ZCard, ZCheckbox, ZConfirmDialog, ZPagination, ZTable } from '@codex-proxy/ui'
 import { ref, shallowRef, watch } from 'vue'
 
 import { useI18n } from 'vue-i18n'
@@ -113,13 +113,14 @@ watch(
 
 <template>
   <div class="flex h-full min-h-0 w-full flex-col overflow-hidden">
-    <ZPageHeader
-      :title="t('navigation.apiKeys')"
-      :description="t('keys.page.description')"
-    />
+    <header class="flex shrink-0 items-center justify-between gap-3">
+      <h1 class="m-0 text-base font-bold tracking-tight text-z-text">
+        {{ t('navigation.apiKeys') }}
+      </h1>
+    </header>
 
     <ZCard
-      class="mt-5 flex h-[calc(100dvh-136px)] min-h-125 flex-col"
+      class="mt-3 flex h-[calc(100dvh-95px)] min-h-125 flex-col"
     >
       <template #header>
         <ApiKeyFilters

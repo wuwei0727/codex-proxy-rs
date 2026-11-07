@@ -91,7 +91,21 @@
       "account": "Account",
       "fieldLabel": "Request detail filter field",
       "enterFilterValue": "Enter filter value",
-      "valueLabel": "Request detail filter value"
+      "valueLabel": "Request detail filter value",
+      "allAccounts": "All Accounts",
+      "allKeys": "All Keys",
+      "allModels": "All Models",
+      "allStatus": "All Status",
+      "statusSuccess": "Success",
+      "statusError": "Error",
+      "failed": "Failed",
+      "viewFailed": "View Failed Records",
+      "viewSuccess": "View Successful Records",
+      "reset": "Reset",
+      "selectAccount": "Select Account",
+      "selectKey": "Select Key",
+      "selectModel": "Select Model",
+      "selectStatus": "Status"
     },
     "route": {
       "compressionRequest": "Compression request"
@@ -346,6 +360,7 @@
       "transportAndUsage": "Transport and usage",
       "modelsAndRouting": "Models and routing",
       "clientAndUpstream": "Client and upstream",
+      "traceIdentifiers": "Trace identifiers",
       "requestId": "Request ID",
       "incompleteDetails": "Incomplete details",
       "total": "Total",
@@ -354,6 +369,7 @@
       "loadingDetails": "Loading request details"
     },
     "successfulRequest": "Successful requests",
+    "failedRequests": "Failed Requests",
     "withinFilterRange": "Within filter range",
     "inputOutput": "Input: {inputTokens} / Output: {outputTokens}",
     "cachedTokens": "Cached tokens",

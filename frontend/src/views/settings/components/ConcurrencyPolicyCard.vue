@@ -29,7 +29,7 @@ const queueFailureOptions = computed(() => [
 
 <template>
   <ZCard :title="t('settings.concurrency.title')">
-    <div class="grid min-w-0 gap-4.5 max-w-6xl sm:grid-cols-2 sm:items-end">
+    <div class="grid min-w-0 gap-5 max-w-6xl sm:grid-cols-2 sm:items-start">
       <ZFormItem
         :show-message="Boolean(maxConcurrentPerAccount.trim())"
         prop="maxConcurrentPerAccount"

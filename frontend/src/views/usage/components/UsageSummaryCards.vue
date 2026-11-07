@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { getUsageRecordSummary } from '@/api'
+import type { getUsageRecordSummary, UsageRecordStatus } from '@/api'
 
 import { ZCard, ZMotionIcon } from '@codex-proxy/ui'
-import { Activity, Database, FileText, Timer } from '@lucide/vue'
+import { Activity, CircleAlert, Database, FileText, Timer } from '@lucide/vue'
 
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -10,6 +10,7 @@ import { useI18n } from 'vue-i18n'
 const props = defineProps<{
   summary: Omit<Awaited<ReturnType<typeof getUsageRecordSummary>>, 'analytics'> | null
   error?: string
+  status?: UsageRecordStatus
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -46,11 +47,15 @@ const averageLatency = computed(() => {
 const items = computed(() => [
   {
     key: 'requests',
-    label: t('usage.successfulRequest'),
-    icon: Activity,
+    label: props.status === 'error'
+      ? t('usage.failedRequests')
+      : (props.status === 'all' ? t('usage.totalRequests') : t('usage.successfulRequest')),
+    icon: props.status === 'error' ? CircleAlert : Activity,
     value: props.summary?.totalRequests,
     detail: t('usage.withinFilterRange'),
-    tone: 'bg-z-blue-container text-z-blue-on-container',
+    tone: props.status === 'error'
+      ? 'bg-z-error-container text-z-error-on-container'
+      : 'bg-z-blue-container text-z-blue-on-container',
   },
   {
     key: 'tokens',
@@ -81,25 +86,25 @@ const items = computed(() => [
 </script>
 
 <template>
-  <section class="mt-5 grid shrink-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" :aria-label="t('usage.usageOverview')">
+  <section class="grid shrink-0 grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4" :aria-label="t('usage.usageOverview')">
     <ZCard
       v-for="item in items"
       :key="item.key"
       as="article"
-      padding="compact"
-      class="grid min-h-23 grid-cols-[36px_minmax(0,1fr)] items-stretch gap-3"
+      padding="none"
+      class="flex items-center gap-3 p-3 transition-colors"
     >
-      <ZMotionIcon class="inline-flex size-9 shrink-0 items-center justify-center rounded-z" :class="item.tone">
-        <component :is="item.icon" class="size-4.5" />
+      <ZMotionIcon class="inline-flex size-8 shrink-0 items-center justify-center rounded-z" :class="item.tone">
+        <component :is="item.icon" class="size-4" />
       </ZMotionIcon>
-      <div class="flex min-w-0 flex-col">
-        <span class="block text-z-sm leading-none font-heavy text-z-text-secondary">
+      <div class="flex min-w-0 flex-1 flex-col justify-center">
+        <span class="block truncate text-xs font-semibold text-z-text-secondary">
           {{ item.label }}
         </span>
-        <strong class="my-2 block truncate font-mono text-[24px] leading-none font-extrabold text-z-text">
-          {{ item.value ?? '0' }}<span v-if="item.unit" class="ml-0.5 font-sans text-z font-semibold text-z-text-secondary">{{ item.unit }}</span>
+        <strong class="my-0.5 block truncate font-mono text-[19px] leading-tight font-extrabold text-z-text">
+          {{ item.value ?? '0' }}<span v-if="item.unit" class="ml-0.5 font-sans text-xs font-semibold text-z-text-secondary">{{ item.unit }}</span>
         </strong>
-        <span class="block truncate text-z-sm leading-none font-emphasis text-z-text-quaternary">
+        <span class="block truncate text-[11px] leading-none text-z-text-quaternary" :title="error || item.detail">
           {{ error || item.detail }}
         </span>
       </div>

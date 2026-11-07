@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Account } from '@/api'
 
-import { useTableColumns, ZCard, ZCheckbox, ZConfirmDialog, ZIconButton, ZPageHeader, ZPagination, ZTable, ZTableColumnSettings } from '@codex-proxy/ui'
+import { useTableColumns, ZCard, ZCheckbox, ZConfirmDialog, ZIconButton, ZPagination, ZTable, ZTableColumnSettings } from '@codex-proxy/ui'
 
 import { ChevronDown } from '@lucide/vue'
 import { ref, shallowRef } from 'vue'
@@ -214,15 +214,16 @@ const {
 
 <template>
   <div class="flex min-h-0 w-full flex-col xl:h-full xl:overflow-hidden">
-    <ZPageHeader
-      :title="t('navigation.accounts')"
-      :description="t('accounts.page.description')"
-    />
+    <header class="flex shrink-0 items-center justify-between gap-3">
+      <h1 class="m-0 text-base font-bold tracking-tight text-z-text">
+        {{ t('navigation.accounts') }}
+      </h1>
+    </header>
 
     <AccountOverviewCards :summary="accountSummary" />
 
     <ZCard
-      class="mt-4 flex flex-col xl:h-[calc(100dvh-250px)] xl:min-h-125"
+      class="mt-3 flex flex-col xl:h-[calc(100dvh-180px)] xl:min-h-125"
     >
       <template #header>
         <AccountFilters

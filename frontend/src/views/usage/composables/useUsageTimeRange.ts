@@ -52,11 +52,24 @@ export function useUsageTimeRange() {
     return rangeParams(Date.now())
   }
 
+  function resetTimeRange() {
+    const today = dateStart(new Date())
+    selectedDates.value = [today, today]
+    refreshTimeRangeEnd()
+  }
+
+  const isDefaultTimeRange = computed(() => {
+    const today = dateStart(new Date()).getTime()
+    return selectedDates.value[0].getTime() === today && selectedDates.value[1].getTime() === today
+  })
+
   return {
     timeRange,
     timeRangeParams,
     disabledDate,
     refreshTimeRangeEnd,
     latestTimeRangeParams,
+    resetTimeRange,
+    isDefaultTimeRange,
   }
 }

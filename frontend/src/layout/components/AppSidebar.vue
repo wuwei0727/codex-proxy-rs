@@ -23,7 +23,7 @@ import {
   Sun,
   Users,
 } from '@lucide/vue'
-import { usePreferredReducedMotion, useTimeoutFn } from '@vueuse/core'
+import { usePreferredReducedMotion, useResizeObserver, useTimeoutFn } from '@vueuse/core'
 import { gsap } from 'gsap'
 import { storeToRefs } from 'pinia'
 
@@ -120,16 +120,12 @@ const navItems = computed(() => ([
     path: '/settings',
   },
 ]))
-const pluginNavIndex = navItems.value.findIndex(item => item.path === '/plugins')
 const pluginMenuVisible = computed(() => pluginGroupExpanded.value && !isCollapsed.value)
 const pluginViewNameCounts = computed(() => pluginPageViews.value.reduce((counts, view) => {
   const title = view.pages[0]?.title ?? view.name
   counts.set(title, (counts.get(title) ?? 0) + 1)
   return counts
 }, new Map<string, number>()))
-const pluginChildrenHeight = computed(() => pluginMenuVisible.value
-  ? (pluginPageViews.value.length + 1) * 44
-  : 0)
 
 function isActive(path: string) {
   if (path === '/')
@@ -137,27 +133,52 @@ function isActive(path: string) {
   return route.path.startsWith(path)
 }
 
-const activeNavIndex = computed(() => {
-  const index = navItems.value.findIndex(item => isActive(item.path))
-  return Math.max(0, index)
+const navEl = useTemplateRef<HTMLElement>('navEl')
+const indicatorStyle = shallowRef({
+  transform: 'translate3d(0, 0, 0)',
+  width: '100%',
+  height: '46px',
+  opacity: 0,
 })
-const activePluginIndex = computed(() => route.name === 'plugins'
-  ? 0
-  : pluginPageViews.value.findIndex(isPluginViewActive) + 1)
-const activeNavIndicatorStyle = computed(() => {
-  const inPluginMenu = isActive('/plugins') && pluginMenuVisible.value
-  const offset = inPluginMenu
-    ? 50 + activePluginIndex.value * 44
-    : activeNavIndex.value > pluginNavIndex
-      ? pluginChildrenHeight.value
-      : 0
-  // 主菜单与子菜单共享选中框，位置和尺寸在同一次过渡中变化
-  return {
-    transform: `translate3d(${inPluginMenu ? 24 : 0}px, ${activeNavIndex.value * 58 + offset}px, 0)`,
-    width: inPluginMenu ? 'calc(100% - 24px)' : '100%',
-    height: inPluginMenu ? '40px' : '46px',
+
+function updateIndicator() {
+  const container = navEl.value
+  if (!container) return
+
+  const activeBtn = container.querySelector<HTMLElement>('button[data-active="true"]')
+  if (!activeBtn) {
+    indicatorStyle.value = {
+      ...indicatorStyle.value,
+      opacity: 0,
+    }
+    return
   }
+
+  const containerRect = container.getBoundingClientRect()
+  const btnRect = activeBtn.getBoundingClientRect()
+  const top = btnRect.top - containerRect.top
+  const left = btnRect.left - containerRect.left
+
+  indicatorStyle.value = {
+    transform: `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`,
+    width: `${Math.round(btnRect.width)}px`,
+    height: `${Math.round(btnRect.height)}px`,
+    opacity: 1,
+  }
+}
+
+useResizeObserver(navEl, () => {
+  updateIndicator()
 })
+
+watch(
+  () => [route.path, route.name, isCollapsed.value, pluginGroupExpanded.value, pluginPageViews.value.length],
+  async () => {
+    await nextTick()
+    updateIndicator()
+  },
+  { flush: 'post' },
+)
 const navFeedbackMuted = shallowRef(false)
 const { start: restoreNavFeedback, stop: stopNavFeedbackRestore } = useTimeoutFn(
   () => {
@@ -371,7 +392,7 @@ function animateNavSignal() {
   )
 }
 
-onMounted(() => {
+onMounted(async () => {
   void pluginViewsStore.ensureLoaded().catch(() => undefined)
   gsap.set(sidebarEl.value, {
     width: sidebarWidth.value,
@@ -388,6 +409,8 @@ onMounted(() => {
   }
   animateSidebarLabels(isCollapsed.value)
   gsap.set(navSignalEl.value, { opacity: 0, xPercent: -70 })
+  await nextTick()
+  updateIndicator()
 })
 
 watch(
@@ -485,10 +508,10 @@ onBeforeUnmount(() => {
     <ZScrollbar class="my-6 w-full flex-1">
       <div :class="isCollapsed ? 'px-2' : 'px-2'">
         <!-- 焦点环绘制在按钮内侧，避免被滚动区和折叠菜单裁切 -->
-        <nav class="relative grid gap-3" :class="isCollapsed ? 'mx-auto w-11.5' : 'w-full'" :aria-label="t('navigation.mainLabel')">
+        <nav ref="navEl" class="relative grid gap-3" :class="isCollapsed ? 'mx-auto w-11.5' : 'w-full'" :aria-label="t('navigation.mainLabel')">
           <span
-            class="pointer-events-none absolute left-0 top-0 overflow-hidden rounded-z bg-z-menu-item-selected-bg transition-[transform,width,height] duration-260 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
-            :style="activeNavIndicatorStyle"
+            class="pointer-events-none absolute left-0 top-0 overflow-hidden rounded-z bg-z-menu-item-selected-bg transition-[transform,width,height,opacity] duration-260 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+            :style="indicatorStyle"
           >
             <span
               ref="navSignal"
@@ -515,6 +538,7 @@ onBeforeUnmount(() => {
                     :aria-expanded="isCollapsed ? undefined : pluginGroupExpanded"
                     :aria-controls="isCollapsed ? undefined : pluginMenuId"
                     :aria-label="isCollapsed ? item.label : undefined"
+                    :data-active="isActive(item.path)"
                     @click="close(); togglePluginGroup()"
                   >
                     <component :is="item.icon" class="shrink-0" :size="20" />
@@ -555,6 +579,7 @@ onBeforeUnmount(() => {
                         ? 'font-emphasis text-z-text'
                         : navFeedbackMuted ? 'font-semibold text-z-text-secondary' : 'font-semibold text-z-text-secondary hover:bg-z-fill-quaternary hover:text-z-text'"
                       :aria-current="route.name === 'plugins' ? 'page' : undefined"
+                      :data-active="route.name === 'plugins'"
                       @click="navigate('/plugins')"
                     >
                       <BringToFront class="block size-4 shrink-0" />
@@ -569,6 +594,7 @@ onBeforeUnmount(() => {
                         ? 'font-emphasis text-z-text'
                         : navFeedbackMuted ? 'font-semibold text-z-text-secondary' : 'font-semibold text-z-text-secondary hover:bg-z-fill-quaternary hover:text-z-text'"
                       :aria-current="isPluginViewActive(view) ? 'page' : undefined"
+                      :data-active="isPluginViewActive(view)"
                       @click="navigatePluginView(view)"
                     >
                       <Blocks class="block size-4 shrink-0" />
@@ -595,6 +621,7 @@ onBeforeUnmount(() => {
                         : 'bg-transparent font-semibold text-z-text-secondary transition-colors duration-200 hover:bg-z-fill-quaternary hover:text-z-text',
                   ]"
                   :aria-label="isCollapsed ? item.label : undefined"
+                  :data-active="isActive(item.path)"
                   @click="close(); navigate(item.path)"
                 >
                   <component :is="item.icon" class="shrink-0" :size="20" />

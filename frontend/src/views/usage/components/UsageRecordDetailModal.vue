@@ -603,7 +603,7 @@ const tokenDonutOption = computed<EChartsOption>(() => {
 
       <section :class="panelClass">
         <h3 :class="panelTitleClass">
-          {{ t('usage.request.requestId') }}
+          {{ t('usage.request.traceIdentifiers') }}
         </h3>
         <UsageDetailFieldGrid :items="identifierItems" />
       </section>

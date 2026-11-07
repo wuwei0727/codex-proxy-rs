@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ZCard, ZCheckbox, ZConfirmDialog, ZPageHeader, ZPagination, ZTable } from '@codex-proxy/ui'
+import { ZCard, ZCheckbox, ZConfirmDialog, ZPagination, ZTable } from '@codex-proxy/ui'
 
 import { ImageOff, Zap, ZapOff } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
@@ -52,13 +52,14 @@ const { allSelected, indeterminate, selectedRowKeys, toggleSelection, toggleAll 
 
 <template>
   <div class="flex h-full min-h-0 w-full flex-col overflow-hidden">
-    <ZPageHeader
-      :title="t('navigation.groups')"
-      :description="t('groups.page.description')"
-    />
+    <header class="flex shrink-0 items-center justify-between gap-3">
+      <h1 class="m-0 text-base font-bold tracking-tight text-z-text">
+        {{ t('navigation.groups') }}
+      </h1>
+    </header>
 
     <ZCard
-      class="mt-5 flex h-[calc(100dvh-136px)] min-h-125 flex-col"
+      class="mt-3 flex h-[calc(100dvh-95px)] min-h-125 flex-col"
     >
       <template #header>
         <AccountGroupFilters
