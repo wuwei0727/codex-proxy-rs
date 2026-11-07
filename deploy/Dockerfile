@@ -37,8 +37,12 @@ COPY release/version.yaml /app/release/version.yaml
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/backend/target \
-    cargo build --release --locked --bin codex-proxy-rs \
-    && cp "${CARGO_TARGET_DIR}/release/codex-proxy-rs" /tmp/codex-proxy-rs
+    version="${CPR_VERSION:-$(sed -n 's/^version:[[:space:]]*//p' /app/release/version.yaml)}" \
+    && version="$(printf '%s' "$version" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/^v*//')" \
+    && test -n "$version" \
+    && CPR_VERSION="$version" cargo build --release --locked --bin codex-proxy-rs \
+    && cp "${CARGO_TARGET_DIR}/release/codex-proxy-rs" /tmp/codex-proxy-rs \
+    && printf '%s' "$version" > /tmp/cpr-version
 
 # 备份客户端来源：与 compose 服务端同一固定镜像，版本一致。
 FROM ${POSTGRES_IMAGE} AS pg-client
@@ -81,13 +85,14 @@ CMD ["/app/bin/codex-proxy-rs"]
 
 FROM runtime-base AS runtime
 
-ARG CPR_VERSION=
 ARG CPR_GIT_SHA=unknown
 
 COPY --from=backend-builder --chown=cpr:cpr /tmp/codex-proxy-rs /app/bin/codex-proxy-rs
+COPY --from=backend-builder /tmp/cpr-version /tmp/cpr-version
 COPY --from=frontend-builder --chown=cpr:cpr /app/frontend/dist ./web/dist
 
-RUN mkdir -p /app/bin/plugins/official &&     printf '{\n  "schema_version": 1,\n  "sealed": true,\n  "gateway_version": "%s",\n  "gateway_git_sha": "%s",\n  "plugin_host": {\n    "schema_version": 2,\n    "manifest_schema_versions": [2],\n    "protocol_versions": [7],\n    "capabilities": [\n      { "capability": "frontend_authentication", "versions": [2] },\n      { "capability": "scheduler", "versions": [3] },\n      { "capability": "model_router", "versions": [2] },\n      { "capability": "model_catalog", "versions": [2] },\n      { "capability": "retry_policy", "versions": [2] },\n      { "capability": "middleware", "versions": [6] },\n      { "capability": "upstream_adapter", "versions": [5] },\n      { "capability": "observer", "versions": [2] },\n      { "capability": "command_line", "versions": [1] },\n      { "capability": "management", "versions": [2] },\n      { "capability": "maintenance", "versions": [1] }\n    ]\n  },\n  "plugins": []\n}\n' "$CPR_VERSION" "$CPR_GIT_SHA" > /app/bin/plugins/official/plugin-release-manifest.json &&     chmod 0444 /app/bin/plugins/official/plugin-release-manifest.json &&     chmod 0555 /app/bin/plugins/official &&     chmod 0755 /app/bin/plugins &&     chown -R cpr:cpr /app/bin/plugins
+# 编译与发行清单使用同一份已解析版本，源码构建不要求调用方传 CPR_VERSION
+RUN version="$(cat /tmp/cpr-version)" && test -n "$version" && rm /tmp/cpr-version && mkdir -p /app/bin/plugins/official &&     printf '{\n  "schema_version": 1,\n  "sealed": true,\n  "gateway_version": "%s",\n  "gateway_git_sha": "%s",\n  "plugin_host": {\n    "schema_version": 2,\n    "manifest_schema_versions": [2],\n    "protocol_versions": [7],\n    "capabilities": [\n      { "capability": "frontend_authentication", "versions": [2] },\n      { "capability": "scheduler", "versions": [3] },\n      { "capability": "model_router", "versions": [2] },\n      { "capability": "model_catalog", "versions": [2] },\n      { "capability": "retry_policy", "versions": [2] },\n      { "capability": "middleware", "versions": [6] },\n      { "capability": "upstream_adapter", "versions": [5] },\n      { "capability": "observer", "versions": [2] },\n      { "capability": "command_line", "versions": [1] },\n      { "capability": "management", "versions": [2] },\n      { "capability": "maintenance", "versions": [1] }\n    ]\n  },\n  "plugins": []\n}\n' "$version" "$CPR_GIT_SHA" > /app/bin/plugins/official/plugin-release-manifest.json &&     chmod 0444 /app/bin/plugins/official/plugin-release-manifest.json &&     chmod 0555 /app/bin/plugins/official &&     chmod 0755 /app/bin/plugins &&     chown -R cpr:cpr /app/bin/plugins
 
 USER cpr
 
