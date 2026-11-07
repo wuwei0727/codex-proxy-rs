@@ -7,7 +7,7 @@ use gateway_admin::model::system::{
 };
 use serde::Deserialize;
 
-use super::release::{GitHubRelease, base_update_detail, fetch_release_json, validate_repository};
+use super::release::{GitHubRelease, base_update_detail, validate_api_base, validate_repository};
 use super::{OperationError, SystemUpdateConfig, conflict};
 
 #[derive(Deserialize)]
@@ -37,6 +37,7 @@ pub(super) async fn detail(
         .as_deref()
         .ok_or_else(|| conflict("未配置更新仓库 CPR_UPDATE_REPOSITORY"))?;
     validate_repository(repository)?;
+    validate_api_base(&config.github_api_base).map_err(conflict)?;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .redirect(reqwest::redirect::Policy::none())
@@ -125,4 +126,27 @@ async fn check_build(
 
 fn valid_sha(value: &str) -> bool {
     value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+pub(super) async fn fetch_release_json<T: serde::de::DeserializeOwned>(
+    client: &reqwest::Client,
+    url: &str,
+) -> Result<T, OperationError> {
+    let response = client
+        .get(url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        .header(reqwest::header::USER_AGENT, "codex-proxy-rs")
+        .send()
+        .await
+        .map_err(|error| super::error::http("无法查询 GitHub 发行版本", error))?;
+    if !response.status().is_success() {
+        return Err(super::upstream(format!(
+            "GitHub 发行查询失败（HTTP {}）",
+            response.status().as_u16()
+        )));
+    }
+    response
+        .json::<T>()
+        .await
+        .map_err(|error| super::error::http("GitHub 发行信息格式无效", error))
 }

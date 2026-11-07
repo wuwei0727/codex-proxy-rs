@@ -248,6 +248,22 @@ class Updater:
                 print(f'{service} 保持摘流，另一节点继续服务；检查日志并人工恢复，禁止继续更新另一节点', flush=True)
             raise
 
+    def validate_schema_transition(self, target_version):
+        """0039 改名与身份转换不支持旧节点继续服务，必须先停双节点。"""
+        def version_tuple(value):
+            match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?', value)
+            if not match:
+                raise RuntimeError('无法确认节点版本，停止滚动更新')
+            return tuple(map(int, match.groups()))
+
+        target = version_tuple(target_version)
+        boundary = (3, 42, 0)
+        for service, _ in self.nodes:
+            current = self.container(service)
+            version = run('docker', 'exec', current['Id'], '/app/bin/codex-proxy-rs', '--version')
+            if (version_tuple(version) < boundary) != (target < boundary):
+                raise RuntimeError('跨越 3.42.0 的数据库迁移不支持滚动升级或仅回退镜像；请按运维手册停双节点升级，尚未修改服务')
+
     def update(self, check=False):
         original = self.preflight()
         if check:
@@ -262,6 +278,7 @@ class Updater:
         version = run('docker', 'run', '--rm', '--network', 'none', image, '/app/bin/codex-proxy-rs', '--version')
         if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?', version):
             raise RuntimeError('镜像版本不合法，未更新任何节点')
+        self.validate_schema_transition(version)
         print(f'已固定镜像 {image}，版本 {version}', flush=True)
         for service, port in self.nodes:
             if self.container(service)['Image'] == image:

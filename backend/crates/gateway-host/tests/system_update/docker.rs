@@ -2,6 +2,7 @@
 
 use super::*;
 use gateway_admin::model::system::DockerBuildStatus;
+use wiremock::matchers::query_param;
 
 const CURRENT: &str = "1111111111111111111111111111111111111111";
 const LATEST: &str = "2222222222222222222222222222222222222222";
@@ -36,7 +37,10 @@ async fn docker_missing_unknown_and_identical_builds_do_not_signal_updates() {
             .mount(&server)
             .await;
         let service = ProcessSystemOperations::new(CancellationToken::new(), config);
-        let detail = service.update_detail(true, None).await.unwrap();
+        let detail = service
+            .update_detail(SystemUpdateCheck::Refresh, None)
+            .await
+            .unwrap();
         assert!(!detail.has_update);
         assert_eq!(detail.docker.unwrap().status, expected);
         assert!(
@@ -76,16 +80,25 @@ async fn docker_failed_refresh_clears_old_candidate_but_keeps_upstream_informati
         .mount(&server)
         .await;
     let service = ProcessSystemOperations::new(CancellationToken::new(), config);
-    assert!(service.update_detail(true, None).await.unwrap().has_update);
+    assert!(
+        service
+            .update_detail(SystemUpdateCheck::Refresh, None)
+            .await
+            .unwrap()
+            .has_update
+    );
     server.reset().await;
     Mock::given(method("GET"))
         .and(path("/repos/zyycn/codex-proxy-rs/releases/latest"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "tag_name":"v3.41.2","prerelease":false,"body":"upstream notes"
+            "tag_name":"v3.41.2","draft":false,"prerelease":false,"body":"upstream notes"
         })))
         .mount(&server)
         .await;
-    let detail = service.update_detail(true, None).await.unwrap();
+    let detail = service
+        .update_detail(SystemUpdateCheck::Refresh, None)
+        .await
+        .unwrap();
     assert!(!detail.has_update);
     assert!(detail.warning.is_some());
     let docker = detail.docker.unwrap();
@@ -93,7 +106,13 @@ async fn docker_failed_refresh_clears_old_candidate_but_keeps_upstream_informati
     assert_eq!(docker.status, DockerBuildStatus::Unknown);
     assert_eq!(docker.upstream_version.as_deref(), Some("v3.41.2"));
     assert!(docker.upstream_warning.is_none());
-    assert!(!service.update_detail(false, None).await.unwrap().has_update);
+    assert!(
+        !service
+            .update_detail(SystemUpdateCheck::Detail, None)
+            .await
+            .unwrap()
+            .has_update
+    );
 }
 
 #[tokio::test]
@@ -126,7 +145,10 @@ async fn docker_build_comparison_does_not_offer_downgrades_or_diverged_commits()
             .mount(&server)
             .await;
         let service = ProcessSystemOperations::new(CancellationToken::new(), config);
-        let detail = service.update_detail(true, None).await.unwrap();
+        let detail = service
+            .update_detail(SystemUpdateCheck::Refresh, None)
+            .await
+            .unwrap();
         assert_eq!(detail.has_update, expected == DockerBuildStatus::Available);
         assert!(!detail.update_supported);
         let docker = detail.docker.unwrap();
@@ -160,4 +182,45 @@ async fn docker_rejects_install_and_rollback_before_network_or_file_changes() {
     assert!(error.message().contains("cpr update"));
     assert!(!fixture.state().exists());
     assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn docker_concurrent_refreshes_share_one_lookup() {
+    let server = MockServer::start().await;
+    let fixture = Fixture::new();
+    let mut config = fixture.config(&format!("{}/repos", server.uri()));
+    config.deployment_mode = "docker".to_owned();
+    config.git_sha = CURRENT.to_owned();
+    Mock::given(method("GET"))
+        .and(path(
+            "/repos/owner/repository/actions/workflows/docker.yml/runs",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_millis(100))
+                .set_body_json(serde_json::json!({"workflow_runs": []})),
+        )
+        .mount(&server)
+        .await;
+    let service = ProcessSystemOperations::new(CancellationToken::new(), config);
+    let (first, second) = tokio::join!(
+        service.update_detail(SystemUpdateCheck::Refresh, None),
+        service.update_detail(SystemUpdateCheck::Refresh, None),
+    );
+    assert_eq!(
+        first.unwrap().docker.unwrap().status,
+        DockerBuildStatus::NoBuild
+    );
+    assert_eq!(
+        second.unwrap().docker.unwrap().status,
+        DockerBuildStatus::NoBuild
+    );
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|r| r.url.path().ends_with("/runs"))
+            .count(),
+        1
+    );
 }

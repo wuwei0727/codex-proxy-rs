@@ -9,7 +9,7 @@ use std::time::{Duration, Instant, SystemTime};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{StreamExt, future::BoxFuture};
-use gateway_core::account::{AccountFeedbackStats, ProviderAccount};
+use gateway_core::account::{AccountAffinity, AccountFeedbackStats, ProviderAccount};
 use gateway_core::engine::continuation::{ContinuationBinding, NativeContinuationScope};
 use gateway_core::engine::middleware::MiddlewareHeader;
 use gateway_core::engine::provider::{
@@ -60,10 +60,10 @@ use crate::credential::{
     CodexCredentialRefreshService, CodexCredentialRepository, CodexCredentialSelector,
     CodexCyberPolicyScope, CodexQuotaRefreshPolicy, CodexSessionAffinity, CredentialSelectionError,
     RuntimeCodexCookie, SelectCodexCredential, SelectCodexProviderEndpointCredential,
-    derive_codex_cyber_policy_session_key, derive_codex_endpoint_session_affinity,
-    derive_codex_session_affinity, derive_codex_transport_key,
-    derive_endpoint_affinity_with_headers, derive_live_session_affinity,
-    derive_previous_response_id_hash, derive_turn_alias,
+    derive_cache_preference, derive_codex_cyber_policy_session_key,
+    derive_codex_endpoint_session_affinity, derive_codex_session_affinity,
+    derive_codex_transport_key, derive_endpoint_affinity_with_headers,
+    derive_live_session_affinity, derive_previous_response_id_hash, derive_turn_alias,
 };
 use crate::request_identity::{account_session_with_headers, turn_id_with_headers};
 use crate::session_transport::{CodexSessionTransportRecovery, WS_PAYLOAD_LIMIT};
@@ -549,6 +549,7 @@ impl Provider for CodexProvider {
 
     async fn query_client_model_catalog(
         &self,
+        client_api_key_id: &gateway_core::policy::ClientApiKeyId,
         scope: &gateway_core::account::scope::FrozenAccountScope,
         protocol: &str,
         client_version: &str,
@@ -560,7 +561,7 @@ impl Provider for CodexProvider {
             return Ok(None);
         }
         self.catalog
-            .client_model_catalog(scope, client_version)
+            .client_model_catalog(client_api_key_id, scope, client_version)
             .await
             .map(Some)
             .map_err(|_| gateway_core::routing::ProviderCatalogUnavailable)
@@ -680,6 +681,19 @@ impl Provider for CodexProvider {
         if let Some(prepared) = preselection.as_ref() {
             prepared.checked_native_continuation_scope(&context)?;
         }
+        let cache_preference = preselection
+            .as_ref()
+            .filter(|prepared| {
+                prepared.session_affinity.is_none()
+                    && prepared.previous_session.is_none()
+                    && context.account_selection_policy().openai_account_affinity()
+                        != AccountAffinity::Relaxed
+                    && context.continuation_attempt() == ContinuationAttempt::None
+                    && !guardian
+            })
+            .and_then(|prepared| {
+                derive_cache_preference(&prepared.upstream, context.client_api_key_ref())
+            });
         let (selection_session_affinity, selection_cyber_policy_key, requires_websocket) =
             preselection.map_or(adapter_affinity.unwrap_or((None, None, false)), |prepared| {
                 let requires_websocket =
@@ -696,6 +710,10 @@ impl Provider for CodexProvider {
                     requires_websocket,
                 )
             });
+        // 内容亲和只交给选号器；中间件复验、轮次关联和原生续接仍只认真实会话
+        let account_affinity = selection_session_affinity
+            .as_ref()
+            .or(cache_preference.as_ref());
         let selection_started_at = Instant::now();
         let selection = async {
             self.selector
@@ -704,12 +722,10 @@ impl Provider for CodexProvider {
                         upstream_model: upstream_model.as_str(),
                         request_url: &self.responses_url,
                         attempt: &context,
-                        session_affinity_key: selection_session_affinity
-                            .as_ref()
-                            .map(|affinity| affinity.key()),
+                        session_affinity_key: account_affinity.map(CodexSessionAffinity::key),
                     },
                     selection_cyber_policy_key.as_ref(),
-                    selection_session_affinity.as_ref(),
+                    account_affinity,
                     requires_websocket,
                     guardian,
                 )
@@ -962,9 +978,11 @@ impl CodexProvider {
                 .map(|affinity| (response_id.to_owned(), affinity))
         });
         let client = self.client_for_request(&context)?;
-        let installation_id = client
-            .profile_state()
-            .effective_installation_id(lease.installation_id());
+        let installation_id = client.profile_state().effective_installation_id(
+            context.client_api_key_ref(),
+            lease.account_id(),
+            lease.installation_id(),
+        );
         scope_request_to_account(&mut upstream_request, &installation_id, account_scope);
         // 父响应的可信关联只恢复此字段，不把首次 Guardian 请求的其他账号状态视为可信
         if let Some((response_id, _)) = &guardian_parent

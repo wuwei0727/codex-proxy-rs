@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AccountModelAccess } from '@/api'
 
-import { ZButton, ZEmpty, ZFormItem, ZIconButton, ZInput, ZPopover, ZScrollbar, ZSegmented } from '@codex-proxy/ui'
+import { ZButton, ZEmpty, ZFormItem, ZIconButton, ZInput, ZPopover, ZSegmented } from '@codex-proxy/ui'
 
 import { CircleAlert, ListChecks, ListMinus, Plus, RefreshCw, Search } from '@lucide/vue'
 import { computed, ref, useTemplateRef, watch } from 'vue'
@@ -257,7 +257,6 @@ watch(search, () => {
               :aria-label="t('accounts.modelAccess.catalogHelpTitle')"
               :aria-describedby="open ? id : undefined"
               :aria-expanded="open"
-              :title="undefined"
               @keydown="handleCatalogHelpKeydown($event, open, close)"
             >
               <CircleAlert class="size-[1em] text-z-xs" aria-hidden="true" />
@@ -301,38 +300,36 @@ watch(search, () => {
       <p v-if="inputError" class="m-0 text-z-xs text-z-error-text" role="alert">
         {{ inputError }}
       </p>
-      <ZScrollbar v-if="groups.length" max-height="15rem" class="min-w-0 -m-1">
-        <div class="grid gap-3 p-1" :aria-busy="loading || undefined">
-          <div v-for="group in groups" :key="group.key" role="group" :aria-label="group.label">
-            <div class="mb-1.5 flex items-center justify-between gap-2">
-              <span class="text-z-xs font-medium text-z-text-secondary">{{ group.label }}</span>
-              <ZIconButton
-                v-if="group.key === 'catalog'"
-                type="primary"
-                variant="link"
-                size="small"
-                class="-my-1 size-6!"
-                :aria-label="allResultsSelected ? t('accounts.modelAccess.deselectAll') : t('accounts.modelAccess.selectAll')"
-                :disabled="disabled || loading"
-                @click="select(group.ids, !allResultsSelected)"
-              >
-                <ListMinus v-if="allResultsSelected" aria-hidden="true" />
-                <ListChecks v-else aria-hidden="true" />
-              </ZIconButton>
-            </div>
-            <div class="grid grid-cols-2 gap-2 @xl:grid-cols-3 @3xl:grid-cols-4">
-              <div
-                v-for="id in group.ids"
-                :key="id"
-                class="flex min-w-0 items-center rounded-z transition-colors duration-150 motion-reduce:transition-none"
-                :class="selectedIds.has(id) ? 'bg-z-primary-container text-z-primary-on-container' : 'bg-z-fill-quaternary text-z-text-secondary hover:bg-z-fill-tertiary hover:text-z-text'"
-              >
-                <AccountModelOption :model-value="selectedIds.has(id)" :label="id" :disabled="disabled" @update:model-value="select([id], $event)" />
-              </div>
+      <div v-if="groups.length" class="grid min-w-0 gap-3" :aria-busy="loading || undefined">
+        <div v-for="group in groups" :key="group.key" role="group" :aria-label="group.label">
+          <div class="mb-1.5 flex items-center justify-between gap-2">
+            <span class="text-z-xs font-medium text-z-text-secondary">{{ group.label }}</span>
+            <ZIconButton
+              v-if="group.key === 'catalog'"
+              type="primary"
+              variant="link"
+              size="small"
+              class="-my-1 size-6!"
+              :aria-label="allResultsSelected ? t('accounts.modelAccess.deselectAll') : t('accounts.modelAccess.selectAll')"
+              :disabled="disabled || loading"
+              @click="select(group.ids, !allResultsSelected)"
+            >
+              <ListMinus v-if="allResultsSelected" aria-hidden="true" />
+              <ListChecks v-else aria-hidden="true" />
+            </ZIconButton>
+          </div>
+          <div class="grid grid-cols-2 gap-2 @xl:grid-cols-3 @3xl:grid-cols-4">
+            <div
+              v-for="id in group.ids"
+              :key="id"
+              class="flex min-w-0 items-center rounded-z transition-colors duration-150 motion-reduce:transition-none"
+              :class="selectedIds.has(id) ? 'bg-z-primary-container text-z-primary-on-container' : 'bg-z-fill-quaternary text-z-text-secondary hover:bg-z-fill-tertiary hover:text-z-text'"
+            >
+              <AccountModelOption :model-value="selectedIds.has(id)" :label="id" :disabled="disabled" @update:model-value="select([id], $event)" />
             </div>
           </div>
         </div>
-      </ZScrollbar>
+      </div>
       <p v-else-if="loading" class="m-0 py-4 text-center text-z-sm text-z-text-tertiary" role="status">
         {{ t('accounts.modelAccess.loadingModel') }}
       </p>

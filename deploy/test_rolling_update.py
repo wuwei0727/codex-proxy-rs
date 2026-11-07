@@ -27,6 +27,28 @@ class RollingTests(unittest.TestCase):
         item.recreate = Mock()
         return item
 
+    def test_schema_transition_rejected_before_mutation(self):
+        for current, target in [('3.41.2', '3.42.1'), ('3.42.1', '3.41.2')]:
+            item = self.updater()
+            item.container = Mock(return_value={'Id': 'cid'})
+            with patch('rolling_update.run', return_value=current):
+                with self.assertRaisesRegex(RuntimeError, '数据库迁移'):
+                    item.validate_schema_transition(target)
+            item.configure.assert_not_called()
+            item.recreate.assert_not_called()
+
+    def test_schema_transition_checks_both_nodes_and_allows_same_schema(self):
+        item = self.updater()
+        item.container = Mock(return_value={'Id': 'cid'})
+        with patch('rolling_update.run', side_effect=['3.42.1', '3.41.2']):
+            with self.assertRaisesRegex(RuntimeError, '数据库迁移'):
+                item.validate_schema_transition('3.42.1')
+        with patch('rolling_update.run', return_value='3.42.1'):
+            item.validate_schema_transition('3.42.2')
+        with patch('rolling_update.run', return_value='unknown'):
+            with self.assertRaisesRegex(RuntimeError, '无法确认'):
+                item.validate_schema_transition('3.42.1')
+
     def test_only_target_is_removed(self):
         result = disabled_config(CONFIG, 18081)
         self.assertIn('18080 max_fails=2;', result)
@@ -152,10 +174,10 @@ class RollingTests(unittest.TestCase):
     def test_first_node_failure_never_updates_second(self):
         item = self.updater()
         item.preflight = Mock(return_value=CONFIG)
-        item.container = Mock(return_value={'Image': 'old'})
+        item.container = Mock(return_value={'Image': 'old', 'Id': 'cid'})
         item.update_node = Mock(side_effect=RuntimeError('node2 failed'))
         config = '{"services":{"codex-proxy-rs":{"image":"latest"},"codex-proxy-rs-2":{"image":"latest"}}}'
-        with patch('rolling_update.run', side_effect=['', config, 'new', 'new', '3.41.0']):
+        with patch('rolling_update.run', side_effect=['', config, 'new', 'new', '3.41.0', '3.41.0', '3.41.0']):
             with self.assertRaisesRegex(RuntimeError, 'node2 failed'):
                 item.update()
         self.assertEqual(item.update_node.call_count, 1)
@@ -164,10 +186,10 @@ class RollingTests(unittest.TestCase):
     def test_same_image_skips_both_nodes(self):
         item = self.updater()
         item.preflight = Mock(return_value=CONFIG)
-        item.container = Mock(return_value={'Image': 'new'})
+        item.container = Mock(return_value={'Image': 'new', 'Id': 'cid'})
         item.update_node = Mock()
         config = '{"services":{"codex-proxy-rs":{"image":"latest"},"codex-proxy-rs-2":{"image":"latest"}}}'
-        with patch('rolling_update.run', side_effect=['', config, 'new', 'new', '3.41.0']):
+        with patch('rolling_update.run', side_effect=['', config, 'new', 'new', '3.41.0', '3.41.0', '3.41.0']):
             item.update()
         item.update_node.assert_not_called()
 
