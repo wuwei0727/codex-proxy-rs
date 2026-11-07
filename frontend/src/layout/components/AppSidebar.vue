@@ -143,7 +143,8 @@ const indicatorStyle = shallowRef({
 
 function updateIndicator() {
   const container = navEl.value
-  if (!container) return
+  if (!container)
+    return
 
   const activeBtn = container.querySelector<HTMLElement>('button[data-active="true"]')
   if (!activeBtn) {
@@ -172,7 +173,13 @@ useResizeObserver(navEl, () => {
 })
 
 watch(
-  () => [route.path, route.name, isCollapsed.value, pluginGroupExpanded.value, pluginPageViews.value.length],
+  () => [
+    route.path,
+    route.name,
+    isCollapsed.value,
+    pluginGroupExpanded.value,
+    pluginPageViews.value.length,
+  ],
   async () => {
     await nextTick()
     updateIndicator()

@@ -143,7 +143,6 @@
       "testTime": "Tested"
     },
     "page": {
-      "description": "Manage account proxies, test connections, and inspect exit IP addresses",
       "searchLabel": "Search proxies",
       "searchPlaceholder": "Search by proxy name",
       "batchTestAction": "Test proxies",

@@ -49,8 +49,12 @@ const items = computed(() => [
     key: 'requests',
     label: props.status === 'error'
       ? t('usage.failedRequests')
-      : (props.status === 'all' ? t('usage.totalRequests') : t('usage.successfulRequest')),
-    icon: props.status === 'error' ? CircleAlert : Activity,
+      : (props.status === 'all'
+          ? t('usage.summary.totalRequests')
+          : t('usage.successfulRequest')),
+    icon: props.status === 'error'
+      ? CircleAlert
+      : Activity,
     value: props.summary?.totalRequests,
     detail: t('usage.withinFilterRange'),
     tone: props.status === 'error'

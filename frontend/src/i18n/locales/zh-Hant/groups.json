@@ -52,7 +52,6 @@
       "capacity": "容量"
     },
     "page": {
-      "description": "將賬號歸類管理，併爲每個 API密鑰指定可使用的賬號",
       "empty": "暫無分組",
       "selectCurrentPageGroup": "選擇當前頁分組",
       "selectGroup": "選擇分組",

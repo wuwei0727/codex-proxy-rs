@@ -93,7 +93,6 @@
       "lastModelRequest": "Recent model request (retained)"
     },
     "page": {
-      "description": "Manage API keys and account access",
       "noApiKeyYet": "No API key yet",
       "selectCurrentPageKey": "Select current page key",
       "selectKey": "Select key",

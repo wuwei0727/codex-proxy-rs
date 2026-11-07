@@ -92,7 +92,7 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
       filterAccount.value
       || filterKey.value
       || filterModel.value
-      || options.status.value !== 'success'
+      || options.status.value !== 'success',
     )
   })
 
@@ -131,7 +131,8 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
         if (sample.items && sample.items.length > 0) {
           sourceRecords = sample.items
         }
-      } catch {
+      }
+      catch {
         // fallback to records.value
       }
     }
@@ -162,7 +163,9 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
     const scaledInput = Math.round(sumInput * scale)
     const scaledOutput = Math.round(sumOutput * scale)
     const scaledCached = Math.round(sumCached * scale)
-    const avgLatency = latencyCount > 0 ? sumLatency / latencyCount : 0
+    const avgLatency = latencyCount > 0
+      ? sumLatency / latencyCount
+      : 0
 
     filteredSummary.value = {
       totalRequests: formatInteger(total),
@@ -172,7 +175,9 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
       cachedInputTokens: formatCompactNumber(scaledCached),
       cacheWriteInputTokens: '0',
       averageLatencyMsValue: avgLatency,
-      averageLatencyMs: avgLatency < 1000 ? `${Math.round(avgLatency)} ms` : `${(avgLatency / 1000).toFixed(2)} s`,
+      averageLatencyMs: avgLatency < 1000
+        ? `${Math.round(avgLatency)} ms`
+        : `${(avgLatency / 1000).toFixed(2)} s`,
     }
   }
 

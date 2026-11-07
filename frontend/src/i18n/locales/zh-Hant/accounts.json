@@ -603,7 +603,6 @@
       "count": "賬號數"
     },
     "page": {
-      "description": "維護賬號池，查看可用性、配額與使用狀態",
       "noAccountDataYet": "暫無賬號數據",
       "collapseStatistics": "收起統計",
       "expandStatistics": "展開統計",

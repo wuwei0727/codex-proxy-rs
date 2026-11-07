@@ -603,7 +603,6 @@
       "count": "Accounts"
     },
     "page": {
-      "description": "Manage the account pool and monitor availability, quota, and usage",
       "noAccountDataYet": "No account data yet",
       "collapseStatistics": "Collapse statistics",
       "expandStatistics": "Expand statistics",

@@ -603,7 +603,6 @@
       "count": "账号数"
     },
     "page": {
-      "description": "维护账号池，查看可用性、配额与使用状态",
       "noAccountDataYet": "暂无账号数据",
       "collapseStatistics": "收起统计",
       "expandStatistics": "展开统计",

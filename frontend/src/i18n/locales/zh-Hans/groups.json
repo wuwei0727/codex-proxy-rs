@@ -52,7 +52,6 @@
       "capacity": "容量"
     },
     "page": {
-      "description": "将账号归类管理，并为每个 API密钥指定可使用的账号",
       "empty": "暂无分组",
       "selectCurrentPageGroup": "选择当前页分组",
       "selectGroup": "选择分组",

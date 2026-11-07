@@ -93,7 +93,6 @@
       "lastModelRequest": "最近模型请求（保留期内）"
     },
     "page": {
-      "description": "管理 API密钥及账号访问范围",
       "noApiKeyYet": "暂无 API密钥",
       "selectCurrentPageKey": "选择当前页密钥",
       "selectKey": "选择密钥",

@@ -143,7 +143,6 @@
       "testTime": "測試時間"
     },
     "page": {
-      "description": "管理賬號使用的代理，測試連接並查看出口 IP",
       "searchLabel": "搜索代理",
       "searchPlaceholder": "搜索代理名稱",
       "batchTestAction": "批量測試代理",

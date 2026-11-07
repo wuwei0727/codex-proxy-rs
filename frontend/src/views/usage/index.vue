@@ -98,7 +98,9 @@ function handleResetAllFilters() {
 }
 
 function toggleRecordStatus() {
-  recordView.value = recordView.value === 'error' ? 'success' : 'error'
+  recordView.value = recordView.value === 'error'
+    ? 'success'
+    : 'error'
 }
 
 const { showDetailModal, selectedUsageRecord, detailIsError, detailLoading, detailError, handleViewDetail, reloadDetail } = useUsageRecordDetail()

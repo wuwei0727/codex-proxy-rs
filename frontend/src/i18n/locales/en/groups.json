@@ -52,7 +52,6 @@
       "capacity": "Capacity"
     },
     "page": {
-      "description": "Organize accounts and control which accounts each API key can use",
       "empty": "No groups yet",
       "selectCurrentPageGroup": "Select current page group",
       "selectGroup": "Select group",
