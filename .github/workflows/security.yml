@@ -39,9 +39,19 @@ jobs:
           tool: cargo-audit@0.22.2
           fallback: none
 
+      - name: Read build toolchains
+        id: toolchains
+        run: ruby .github/scripts/toolchains.rb >> "$GITHUB_OUTPUT"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ steps.toolchains.outputs.rust }}
+
       - name: Run Cargo audits
         run: |
-          cargo-audit audit --file backend/Cargo.lock
+          python3 .github/scripts/test_audit_backend.py
+          python3 .github/scripts/audit-backend.py
 
   frontend-security:
     runs-on: ubuntu-26.04
