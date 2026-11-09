@@ -1388,6 +1388,7 @@ OAuth 等待回调期间不持有保护；提交仍拒绝已删除或连接配�
   "source": "upstream",
   "gatewayErrorCode": "rate_limited",
   "sendState": "sent",
+  "proxyHint": null,
   "error": "upstream unavailable",
   "providerErrorCode": "usage_exhausted",
   "providerErrorType": "invalid_request_error",
@@ -1403,6 +1404,9 @@ OAuth 等待回调期间不持有保护；提交仍拒绝已删除或连接配�
 - `source` 为 `gateway`、`provider` 或 `upstream`：分别表示尚未进入 Provider、Provider 本地且未发送、
   已发送/可能已发送或已经捕获到上游事实
 - `gatewayErrorCode` 是 `GatewayErrorKind` 的稳定机器值，管理端据此生成中文摘要
+- `proxyHint` 仅在 Provider 发送前失败且有代理诊断时返回：`invalid_configuration` 表示代理配置无效，
+  `unreachable` 表示无法连接代理端点，`tunnel_failed` 表示代理隧道协商失败。
+  `check_proxy` 表示本次使用代理且建连失败，不能据此判定故障在代理；无提示时为 `null`
 - `sendState` 为 `not_sent`、`sent`、`ambiguous`，非 Provider 错误为 `null`
 - `error`、`providerErrorCode`、`providerErrorType`、`upstreamStatus`、`upstreamContentType` 和
   `upstreamBody` 是实际捕获的原始诊断字段；缺失时为 `null`，不会由本地猜测或翻译
@@ -1602,8 +1606,10 @@ OpenAI 授权码交换与令牌刷新请求的连接超时为 30 秒，单次上
   失效后需取得新 PAT 再导入
 - 首次 OAuth 保留回调 `state`、PKCE 与官方 token exchange，并持久化 `idToken`、`accessToken`、
   `refreshToken`。刷新响应中的三个 token 字段均按官方语义独立轮换：返回新值时替换，省略时分别保留
-  现值。重新授权也保留这些回调保护，但只轮换目标账号的 token。回调地址只承载 `code`/`state`，
-  不以 host/path 形式作为拒绝条件
+  现值。回调地址只承载 `code`/`state`，不以 host/path 形式作为拒绝条件
+- OpenAI 重新授权允许登录另一个上游账号。保留本地账号 ID、名称和调度设置，按新授权更新令牌、
+  上游用户与工作区 ID、邮箱和套餐。换号时清除旧账号的额度快照和耗尽状态，新额度由后台重新查询。
+  无法识别新用户或新身份已绑定其他记录时，原账号保持不变
 - OAuth 账号文件导入和 OAuth complete（包括重新授权）在 credential 提交后后台尝试一次额度观测，不等待
   观测完成才返回成功。观测失败只记录告警，不回滚已提交的账号；手工或后台 RT 刷新只更新 token，
   不隐式等同于手工额度刷新，也不更新既有账号资料或 OAuth principal。xAI 导入与 OAuth complete
@@ -3121,7 +3127,8 @@ GitHub 的 `location` 使用 `kind: "github"`、`repository: "owner/repo"`、`ta
 
 回调保持类型、期限、取消、实例 revision、资源归属和事务一致性检查。模型调用可显式选择 Key，按所选 Key 的准入、预算、用量与计费合同执行；省略 Key 时继承现有模型父请求身份
 
-受管 HTTP 不限制插件目标地址段。宿主解析 DNS，连接保留原始 Host 与 TLS 域名校验；代理沿用账号配置，失败不自动回退直连，重定向不自动跟随
+受管 HTTP 不限制插件目标地址段。宿主解析 DNS，连接保留原始 Host 与 TLS 域名校验；出口可继承调用范围、指定账号或按代理 ID 选择，连接失败不自动回退直连，重定向不自动跟随。
+显式代理选择与目录查询见 [SDK 网络回调](../backend/crates/gateway-plugin/sdk/docs/capabilities.md#网络)
 
 #### 能力绑定与范围
 

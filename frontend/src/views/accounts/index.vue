@@ -213,7 +213,7 @@ const {
 </script>
 
 <template>
-  <div class="flex min-h-0 w-full flex-col xl:h-full xl:overflow-hidden">
+  <div class="flex min-h-0 w-full flex-col xl:h-[calc(100dvh-3rem)] xl:flex-none!">
     <header class="flex shrink-0 items-center justify-between gap-3">
       <h1 class="m-0 text-base font-bold tracking-tight text-z-text">
         {{ t('navigation.accounts') }}
@@ -223,7 +223,7 @@ const {
     <AccountOverviewCards :summary="accountSummary" />
 
     <ZCard
-      class="mt-3 flex flex-col xl:h-[calc(100dvh-180px)] xl:min-h-125"
+      class="mt-3 flex flex-col xl:min-h-80 xl:flex-1"
     >
       <template #header>
         <AccountFilters

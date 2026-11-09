@@ -2889,6 +2889,102 @@ async fn image_endpoints_bypass_only_the_text_catalog_and_preserve_the_current_c
 }
 
 #[tokio::test]
+async fn image_quota_headers_keep_the_codex_weekly_window_and_access_state() {
+    let store = Arc::new(MemoryAccountStore::default());
+    let account_id = "acct_provider_contract";
+    create_account(&store, account_id).await;
+    let account = store.account(account_id).expect("account");
+    let server = MockServer::start().await;
+    let (provider, quota) = provider_and_quota_with_affinity_and_base_url_and_leases(
+        &store,
+        Arc::new(MemorySessionAffinity::default()),
+        server.uri(),
+        Arc::new(TestLeaseCoordinator::default()),
+        0,
+    );
+    let core_headers = [
+        ("x-codex-active-limit", "codex"),
+        ("x-codex-primary-used-percent", "95"),
+        ("x-codex-primary-window-minutes", "10080"),
+        ("x-codex-primary-reset-at", "1900604800"),
+        ("x-codex-allowed", "true"),
+    ]
+    .map(|(name, value)| (name.to_owned(), value.to_owned()));
+    quota
+        .synchronize_passive_headers(&account, &core_headers)
+        .await
+        .expect("initial weekly quota");
+    let initial = quota.read_account(account.id()).await.unwrap().unwrap();
+    let response = br#"{"data":[{"b64_json":"AAEC"}]}"#;
+    // 生图响应仅用 active-limit 标明归属，窗口仍使用通用 x-codex 头
+    Mock::given(method("POST"))
+        .and(path("/codex/images/generations"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("x-codex-active-limit", "imagegen_premium")
+                .insert_header("x-codex-primary-used-percent", "0")
+                .insert_header("x-codex-primary-window-minutes", "1440")
+                .insert_header("x-codex-primary-reset-at", "1900000000")
+                .insert_header("x-codex-secondary-used-percent", "0")
+                .insert_header("x-codex-secondary-window-minutes", "0")
+                .insert_header("x-codex-secondary-reset-at", "")
+                .set_body_raw(response.as_slice(), "application/json"),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let payload = RawJsonPayload::new(
+        "openai",
+        Bytes::from_static(br#"{"model":"gpt-image-2.6-flare","prompt":"a tree"}"#),
+    )
+    .unwrap();
+    let operation = Operation::GenerateImage(ImageRequest::from_raw_json(
+        ImageRequestKind::Generation,
+        payload,
+    ));
+    let mut stream = provider
+        .execute(
+            planned_provider_endpoint_request("openai", operation),
+            context("req_image_quota", CancellationToken::new()),
+        )
+        .await
+        .expect("image stream");
+    let mut delivered = None;
+    while let Some(event) = stream.next().await {
+        let event = event.expect("image event");
+        if let Some(body) = event.wire_event().and_then(|wire| wire.raw_json_body()) {
+            delivered = Some(body.clone());
+        }
+    }
+    assert_eq!(delivered.as_deref(), Some(response.as_slice()));
+
+    let snapshot = quota.read_account(account.id()).await.unwrap().unwrap();
+    let core = snapshot
+        .windows()
+        .iter()
+        .find(|window| window.is_account_wide())
+        .unwrap();
+    let image = snapshot
+        .windows()
+        .iter()
+        .find(|window| window.source() == "imagegen_premium")
+        .unwrap();
+    assert_eq!(core, &initial.windows()[0]);
+    assert_eq!(image.window_seconds(), Some(86_400));
+    assert_eq!(image.used_percent(), Some(0.0));
+    assert!(!image.is_account_wide());
+    assert_eq!(store.account(account_id).unwrap().quota(), initial.quota());
+
+    quota
+        .synchronize_passive_headers(&account, &core_headers)
+        .await
+        .expect("next Codex quota observation");
+    let refreshed = quota.read_account(account.id()).await.unwrap().unwrap();
+    assert_eq!(refreshed.windows(), snapshot.windows());
+    server.verify().await;
+}
+
+#[tokio::test]
 async fn image_endpoints_should_report_usage_before_delivering_the_unchanged_body() {
     let response = br#"{ "created":1778832973,"data":[{"b64_json":"AAEC"}],"quality":"medium","size":"1024x1536","usage":{"input_tokens":1474,"input_tokens_details":{"image_tokens":1457,"text_tokens":17,"cached_tokens":100},"output_tokens":1372,"output_tokens_details":{"image_tokens":1372,"text_tokens":0},"total_tokens":2846},"future":9007199254740993 }"#;
     let expected = Usage {
@@ -4166,12 +4262,44 @@ async fn websocket_fast_path_miss_uses_http_and_keeps_background_preconnect() {
 
 #[tokio::test]
 async fn connection_failure_preserves_io_cause_without_claiming_payload_was_sent() {
-    for websocket in [false, true] {
+    use gateway_core::error::ProxyConnectionHint;
+    for (websocket, proxy_hint) in [
+        (false, None),
+        (true, None),
+        (false, Some(ProxyConnectionHint::CheckProxy)),
+        (true, Some(ProxyConnectionHint::Unreachable)),
+        (true, Some(ProxyConnectionHint::TunnelFailed)),
+    ] {
         let store = Arc::new(MemoryAccountStore::default());
         create_account(&store, "acct_abrupt_disconnect").await;
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base_url = format!("http://{}", listener.local_addr().unwrap());
-        drop(listener);
+        let rejection = if proxy_hint == Some(ProxyConnectionHint::TunnelFailed) {
+            Some(tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                assert!(
+                    capture_http_request(&mut socket)
+                        .await
+                        .starts_with(b"CONNECT ")
+                );
+                socket
+                    .write_all(
+                        b"HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n",
+                    )
+                    .await
+                    .unwrap();
+            }))
+        } else {
+            drop(listener);
+            None
+        };
+        if proxy_hint.is_some() {
+            store.set_egress(
+                "acct_abrupt_disconnect",
+                Some(gateway_core::account::OutboundProxy::parse(&base_url).unwrap()),
+                None,
+            );
+        }
         let operation = if websocket {
             Operation::Generate(generate_with_persisted_session_context(
                 "acct_abrupt_disconnect",
@@ -4197,7 +4325,13 @@ async fn connection_failure_preserves_io_cause_without_claiming_payload_was_sent
             }
         };
         let diagnostic = error.diagnostic().expect("connection diagnosis");
-        assert_eq!(diagnostic.code(), Some("connection_refused"));
+        assert_eq!(diagnostic.proxy_hint(), proxy_hint);
+        if let Some(rejection) = rejection {
+            rejection.await.unwrap();
+        }
+        if proxy_hint.is_none() {
+            assert_eq!(diagnostic.code(), Some("connection_refused"));
+        }
         assert_eq!(diagnostic.stage(), Some("connect"));
         assert_eq!(error.send_state(), UpstreamSendState::NotSent);
         assert!(!diagnostic.as_str().contains("after payload send"));
@@ -10095,7 +10229,7 @@ async fn successful_response_with_full_subscription_blocks_subsequent_requests()
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("content-type", "text/event-stream")
-                .insert_header("x-codex-active-limit", "codex")
+                .insert_header("x-codex-active-limit", "premium")
                 .insert_header("x-codex-primary-used-percent", "100")
                 .insert_header("x-codex-primary-window-minutes", "300")
                 .insert_header("x-codex-primary-reset-at", "1900000000")
