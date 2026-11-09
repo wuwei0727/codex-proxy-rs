@@ -104,7 +104,7 @@ function handleCopyUserAgent(ua?: string | null) {
         <span class="truncate font-medium">{{ row.clientApiKeyName }}</span>
       </div>
       <div
-        v-if="row.accountNotes?.trim() && row.accountNotes?.trim() !== row.accountEmail?.trim() && row.accountNotes?.trim() !== usageAccountText(row)"
+        v-if="row.accountNotes?.trim()"
         class="mt-0.5 flex max-w-full items-center gap-1.5 text-z-xs text-z-text-secondary"
         :title="`账号备注: ${row.accountNotes}`"
       >
