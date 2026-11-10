@@ -25,7 +25,7 @@ const latencyTones = {
 </script>
 
 <template>
-  <div class="flex w-full min-w-0 items-center justify-between gap-1 overflow-hidden">
+  <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
     <div
       class="grid grid-cols-[auto_1fr] items-baseline gap-x-2 gap-y-1 whitespace-nowrap font-mono text-z-sm leading-none font-heavy tabular-nums text-left min-w-0"
     >
