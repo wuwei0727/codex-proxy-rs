@@ -116,7 +116,7 @@ impl std::fmt::Debug for CodexResetCreditsError {
 
 enum ResetCreditAttemptError {
     InvalidCredential,
-    Upstream(CodexClientError),
+    Upstream(Box<CodexClientError>),
 }
 
 impl CodexCredentialQuotaService {
@@ -217,7 +217,7 @@ async fn list_reset_credits_once(
         .map_err(|_| ResetCreditAttemptError::InvalidCredential)?;
     client
         .for_account(&prepared.account)
-        .map_err(ResetCreditAttemptError::Upstream)?
+        .map_err(|error| ResetCreditAttemptError::Upstream(Box::new(error)))?
         .list_rate_limit_reset_credits(CodexRequestContext::auxiliary(
             authorization.expose_secret(),
             prepared.account.upstream_account_id(),
@@ -225,7 +225,7 @@ async fn list_reset_credits_once(
             None,
         ))
         .await
-        .map_err(ResetCreditAttemptError::Upstream)
+        .map_err(|error| ResetCreditAttemptError::Upstream(Box::new(error)))
 }
 
 async fn consume_reset_credit_once(
@@ -242,7 +242,7 @@ async fn consume_reset_credit_once(
         .map_err(|_| ResetCreditAttemptError::InvalidCredential)?;
     client
         .for_account(&prepared.account)
-        .map_err(ResetCreditAttemptError::Upstream)?
+        .map_err(|error| ResetCreditAttemptError::Upstream(Box::new(error)))?
         .consume_rate_limit_reset_credit(
             CodexRequestContext::auxiliary(
                 authorization.expose_secret(),
@@ -254,7 +254,7 @@ async fn consume_reset_credit_once(
             redeem_request_id,
         )
         .await
-        .map_err(ResetCreditAttemptError::Upstream)
+        .map_err(|error| ResetCreditAttemptError::Upstream(Box::new(error)))
 }
 
 fn map_reset_credit_attempt_error(
@@ -263,7 +263,7 @@ fn map_reset_credit_attempt_error(
 ) -> CodexResetCreditsError {
     match error {
         ResetCreditAttemptError::InvalidCredential => CodexResetCreditsError::InvalidCredentialData,
-        ResetCreditAttemptError::Upstream(error) => map_reset_credit_client_error(error, consume),
+        ResetCreditAttemptError::Upstream(error) => map_reset_credit_client_error(*error, consume),
     }
 }
 

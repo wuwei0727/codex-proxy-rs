@@ -138,6 +138,7 @@ pub enum ApiConfigError {
 
 /// 完成组装的唯一 API router
 pub struct ApiBundle {
+    peer_node: HeaderValue,
     router: Router,
     settings: middleware::SettingsSource,
     middleware: Option<middleware::PlanSource>,
@@ -170,6 +171,7 @@ impl ApiBundle {
                 self.timeout,
                 self.request_id_header.clone(),
                 self.settings.clone(),
+                self.peer_node.clone(),
             ),
             settings: self.settings.clone(),
         })
@@ -182,12 +184,15 @@ impl ApiBundle {
             self.timeout,
             self.request_id_header,
             self.settings,
+            self.peer_node,
         )
     }
 }
 
 /// 组装客户端、管理端、健康检查和静态资源路由
+#[expect(clippy::too_many_arguments)]
 pub fn initialize(
+    peer_node: uuid::Uuid,
     mut config: ApiConfig,
     execution: Arc<dyn ExecutionService>,
     admin: AdminServices,
@@ -258,6 +263,8 @@ pub fn initialize(
                     axum::http::header::AUTHORIZATION,
                     axum::http::header::CONTENT_TYPE,
                     HeaderName::from_static("x-api-key"),
+                    HeaderName::from_static("anthropic-version"),
+                    HeaderName::from_static("anthropic-beta"),
                     request_id_header.clone(),
                 ])
                 .allow_credentials(true),
@@ -305,6 +312,13 @@ pub fn initialize(
         ))
         .with_state(state);
     Ok(ApiBundle {
+        peer_node: HeaderValue::from_bytes(
+            peer_node
+                .simple()
+                .encode_lower(&mut uuid::Uuid::encode_buffer())
+                .as_bytes(),
+        )
+        .expect("UUID encodes as ASCII"),
         settings,
         router,
         middleware: None,

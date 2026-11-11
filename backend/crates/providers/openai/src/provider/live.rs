@@ -365,7 +365,7 @@ impl CodexProvider {
             .collect::<Vec<_>>();
         let events = cold_live_call_stream(ColdLiveCall {
             client: self
-                .client_for_request(&context)?
+                .client_for_request(&context, lease.account())?
                 .for_account(lease.account())
                 .map_err(|error| map_client_error(error, UpstreamSendState::NotSent, None).error)?
                 .with_responses_api_base_url(lease.authentication().responses_api_base_url())
@@ -471,7 +471,7 @@ fn cold_live_call_stream(request: ColdLiveCall) -> EventStream {
                 &request.protocol_headers,
                 request.body.clone(),
                 request_context,
-            ) => response.map_err(CodexHandshakeAttemptError::Client),
+            ) => response.map_err(|error| CodexHandshakeAttemptError::Client(Box::new(error))),
         };
         if let Err(CodexHandshakeAttemptError::Client(error)) = &attempt {
             log_client_upstream_error(
@@ -526,7 +526,7 @@ fn cold_live_call_stream(request: ColdLiveCall) -> EventStream {
 
         let response_meta = ResponseMeta::for_provider_endpoint(&request_id);
         yield ProviderEvent::canonical(GatewayEvent::Started(response_meta.clone()));
-        let wire = ProtocolWireEvent::raw_http_body(PROVIDER_NAME, response.body).map_err(|_| {
+        let wire = ProtocolWireEvent::raw_http_body(OPENAI_PROTOCOL, response.body).map_err(|_| {
             provider_error(ProviderErrorKind::Protocol, UpstreamSendState::Sent)
         })?;
         yield ProviderEvent::wire(wire);

@@ -21,7 +21,12 @@ const MAXIMUM_EXPANDED_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_MANIFEST_BYTES: u64 = 64 * 1024;
 
 #[derive(Parser)]
-#[command(name = "cpr-plugin", version, about = "Codex Proxy 插件开发工具")]
+#[command(
+    name = "cpr-plugin",
+    bin_name = "cpr-plugin",
+    version,
+    about = "Codex Proxy 插件开发工具"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
