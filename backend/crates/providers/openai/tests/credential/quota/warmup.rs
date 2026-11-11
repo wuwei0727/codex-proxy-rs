@@ -3,6 +3,49 @@
 use super::*;
 use gateway_core::account::{OpaqueProviderData, QuotaObservation, QuotaWriteOutcome};
 
+#[tokio::test]
+async fn warmup_obeys_configured_quota_limits() {
+    for (used, paused) in [(79, false), (80, true), (90, true)] {
+        let server = MockServer::start().await;
+        let store = Arc::new(MemoryAccountStore::default());
+        let id = "acct_warmup_quota_limit";
+        create_account(&store, id).await;
+        store.set_quota_limits(
+            id,
+            serde_json::from_value(json!({"codex:604800s": 80})).unwrap(),
+        );
+        Mock::given(method("GET"))
+            .and(path("/api/codex/usage"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "rate_limit": {
+                    "allowed": true,
+                    "primary_window": {"used_percent": 0, "limit_window_seconds": 18000},
+                    "secondary_window": {"used_percent": used, "limit_window_seconds": 604800}
+                }
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+        mount_completion(&server, u64::from(!paused)).await;
+        let service = quota_service_with_base_url(
+            &store,
+            reqwest::Client::builder().no_proxy().build().unwrap(),
+            server.uri(),
+        );
+        service
+            .refresh_account(store.account(id).unwrap().id())
+            .await
+            .unwrap();
+        assert_eq!(store.account(id).unwrap().quota_paused(), paused);
+
+        let summary = service.execute_warmup("test-model").await.unwrap();
+
+        assert_eq!(summary.failed, 0);
+        assert_eq!(summary.warmed_up, u64::from(!paused), "used={used}");
+        server.verify().await;
+    }
+}
+
 fn short_window(used: u64, remaining: Option<u64>, reset: i64) -> serde_json::Value {
     let mut window = json!({
         "used_percent": used,

@@ -11,6 +11,7 @@ enum WarmupDecision<'a> {
 fn warmup_account_is_available(account: &ProviderAccount) -> bool {
     account.authentication_kind() == crate::credential::CODEX_AUTHENTICATION_KIND_OAUTH
         && account.enabled()
+        && !account.quota_paused()
         && matches!(
             account.credential_state(),
             CredentialState::Unknown | CredentialState::Ready
