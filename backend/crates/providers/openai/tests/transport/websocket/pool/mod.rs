@@ -61,7 +61,7 @@ fn search_request(downstream_ws: bool, overrides: Value) -> CodexResponsesReques
 async fn send(
     client: &CodexBackendClient,
     request: &CodexResponsesRequest,
-) -> CodexClientResult<CollectedBackendResponse> {
+) -> CollectedBackendResult {
     timeout(
         Duration::from_secs(3),
         client.create_response(
@@ -71,6 +71,7 @@ async fn send(
     )
     .await
     .expect("request must finish without waiting for pool expiry")
+    .map_err(Box::new)
 }
 
 #[tokio::test]
@@ -162,7 +163,7 @@ async fn search_activation_rejects_native_delta_then_accepts_full_replay() {
         server.abort();
         panic!("connection-local delta must require client replay before sending");
     }
-    let CodexClientError::WebSocket(error) = result.unwrap_err() else {
+    let CodexClientError::WebSocket(error) = *result.unwrap_err() else {
         panic!("expected a typed continuation error");
     };
     assert!(error.continuation_unavailable_reason().is_some());

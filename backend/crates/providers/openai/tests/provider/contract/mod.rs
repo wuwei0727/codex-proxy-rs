@@ -4361,12 +4361,27 @@ async fn connection_failure_preserves_io_cause_without_claiming_payload_was_sent
             );
         }
         let operation = if websocket {
-            Operation::Generate(generate_with_persisted_session_context(
+            // 下游 WebSocket 新链禁止 HTTP 回退，才能独立核对 WebSocket 拨号阶段的诊断
+            let request = generate_with_persisted_session_context(
                 "acct_abrupt_disconnect",
                 "conversation-refused",
                 "session-refused",
                 "turn-refused",
-            ))
+            );
+            Operation::Generate(
+                GenerateRequest::from_protocol_payload(
+                    request
+                        .protocol_payload()
+                        .clone()
+                        .with_context(Map::from_iter([(
+                            "downstream_websocket_connection_id".to_owned(),
+                            json!("diagnostic-websocket"),
+                        )])),
+                )
+                .with_provider_session_state(
+                    request.provider_session_state("openai").unwrap().clone(),
+                ),
+            )
         } else {
             http_generate_operation()
         };

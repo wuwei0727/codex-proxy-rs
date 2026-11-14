@@ -40,11 +40,13 @@ fn openai_config_preserves_optional_routing_header_values() {
 #[test]
 fn openai_config_derives_identity_secret_from_runtime_data_dir() {
     let mut config = valid_config();
+    let runtime_data_dir = Path::new("/srv/gateway/runtime-data");
     config
-        .resolve_and_validate(Path::new("/srv/gateway/runtime-data"))
+        .resolve_and_validate(runtime_data_dir)
         .expect("valid OpenAI config");
 
-    assert!(format!("{config:?}").contains("/srv/gateway/runtime-data/identity_hmac_secret"));
+    let expected = runtime_data_dir.join("identity_hmac_secret");
+    assert!(format!("{config:?}").contains(&format!("{expected:?}")));
 }
 
 #[test]

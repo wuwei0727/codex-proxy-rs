@@ -563,7 +563,7 @@ async fn websocket_execute_response_create_request_should_preserve_opening_error
     });
     let prepared = prepared_websocket_request(&format!("http://{addr}"));
 
-    let error = execute_response_create_request(&prepared)
+    let error = *execute_response_create_request(&prepared)
         .await
         .expect_err("failed opening should surface upstream status");
     let expected_body = server.await.unwrap();
@@ -710,7 +710,7 @@ async fn websocket_opening_error_should_convert_http_date_retry_after_to_seconds
     });
     let prepared = prepared_websocket_request(&format!("http://{addr}"));
 
-    let error = execute_response_create_request(&prepared)
+    let error = *execute_response_create_request(&prepared)
         .await
         .expect_err("failed opening should surface upstream status");
     server.await.unwrap();
@@ -755,7 +755,7 @@ async fn websocket_execute_response_create_request_should_reject_binary_event() 
     )
     .expect("prepare continuation WebSocket request");
 
-    let error = execute_response_create_request(&prepared)
+    let error = *execute_response_create_request(&prepared)
         .await
         .expect_err("binary websocket events should be rejected");
     server.await.unwrap();
@@ -1525,6 +1525,12 @@ async fn websocket_stream_should_keep_alive_without_requiring_pong_below_idle_ti
             .await
             .unwrap();
         websocket.close(None).await.unwrap();
+        // 排空未读 Ping 并完成关闭握手，避免 Windows 用 TCP reset 丢弃终态帧
+        while let Some(Ok(message)) = websocket.next().await {
+            if matches!(message, Message::Close(_)) {
+                break;
+            }
+        }
     });
     let prepared = prepared_websocket_request(&format!("http://{addr}"));
     let response_task =
@@ -1577,7 +1583,7 @@ async fn websocket_connection_limit_should_be_reported_without_transport_retry()
         );
     });
     let prepared = prepared_websocket_request(&format!("http://{addr}"));
-    let error = execute_response_create_request(&prepared)
+    let error = *execute_response_create_request(&prepared)
         .await
         .expect_err("transport reports rejection");
     assert!(matches!(
@@ -2085,6 +2091,12 @@ async fn codex_backend_client_stream_should_wait_for_terminal_after_active_webso
             .await
             .unwrap();
         websocket.close(None).await.unwrap();
+        // 等待关闭握手排空保活帧，不能在终态写入后立即丢弃 TCP 连接
+        while let Some(Ok(message)) = websocket.next().await {
+            if matches!(message, Message::Close(_)) {
+                break;
+            }
+        }
     });
     let mut request = codex_request("gpt-5.5", "be brief", Vec::new());
     request.set_previous_response_id(Some("resp_previous".to_string()));

@@ -126,6 +126,17 @@ where
     .expect("accept test WebSocket")
 }
 
+pub(crate) async fn send_control_until_closed(
+    control: &gateway_core::engine::response_control::ResponseControl,
+    payload: &str,
+) -> Result<(), gateway_core::engine::response_control::ResponseControlUnavailable> {
+    // Windows 可一次缓存整条大帧，连续写入才能观察背压；限制次数避免夹具失效时无限占用内存
+    for _ in 0..16 {
+        control.send(payload).await?;
+    }
+    panic!("the unread connection must apply backpressure before sixteen large writes finish");
+}
+
 pub(crate) fn test_wire_profile() -> CodexWireProfileState {
     CodexWireProfileState::new(CodexWireProfile {
         client_kind: provider_openai::transport::profile::selection::ClientKind::Desktop,
@@ -186,6 +197,8 @@ pub(crate) struct CollectedBackendResponse {
     connection_local_continuation: bool,
 }
 
+type CollectedBackendResult = Result<CollectedBackendResponse, Box<CodexClientError>>;
+
 pub(crate) trait CodexBackendClientTestExt {
     async fn create_response(
         &self,
@@ -218,7 +231,9 @@ impl CodexBackendClientTestExt for CodexBackendClient {
         let response = self
             .create_response_stream_with_pool_account(request, context, None)
             .await?;
-        collect_backend_response(response, started_at).await
+        collect_backend_response(response, started_at)
+            .await
+            .map_err(|error| *error)
     }
 
     async fn create_response_stream(
@@ -240,14 +255,16 @@ impl CodexBackendClientTestExt for CodexBackendClient {
         let response = self
             .create_response_stream_with_pool_account(request, context, pool_account_id)
             .await?;
-        collect_backend_response(response, started_at).await
+        collect_backend_response(response, started_at)
+            .await
+            .map_err(|error| *error)
     }
 }
 
 async fn collect_backend_response(
     response: CodexBackendStreamingResponse,
     started_at: Instant,
-) -> CodexClientResult<CollectedBackendResponse> {
+) -> CollectedBackendResult {
     let CodexBackendStreamingResponse {
         mut body,
         transport,
@@ -310,7 +327,7 @@ async fn collect_backend_response(
 
 async fn execute_response_create_request(
     request: &CodexWebSocketRequest,
-) -> CodexClientResult<CollectedBackendResponse> {
+) -> CollectedBackendResult {
     let endpoint = request.connection().endpoint();
     let base_url = endpoint
         .strip_suffix("/codex/responses")
@@ -333,6 +350,7 @@ async fn execute_response_create_request(
             request_context("req_test_websocket", Some("chatgpt-account")),
         )
         .await
+        .map_err(Box::new)
 }
 
 fn codex_request(

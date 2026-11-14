@@ -1,7 +1,7 @@
 //! 验证控制消息写入阻塞时，超时、取消和空闲池回收仍能释放物理连接
 
 use super::*;
-use crate::transport::accept_codex_test_websocket_with;
+use crate::transport::{accept_codex_test_websocket_with, send_control_until_closed};
 
 #[tokio::test]
 async fn receive_timeout_should_abort_stalled_control_write() {
@@ -72,13 +72,19 @@ async fn pool_shutdown_should_abort_stalled_idle_control_write() {
 
     let payload =
         json!({"type": "future.control", "data": "x".repeat(16 * 1024 * 1024)}).to_string();
-    let pending = control.send(&payload);
+    let pending = send_control_until_closed(&control, &payload);
     tokio::pin!(pending);
     tokio::select! {
         result = &mut pending => panic!("control write should stall: {result:?}"),
         ready = started_rx => ready.unwrap(),
         () = tokio::time::sleep(Duration::from_secs(5)) => panic!("control write should start"),
     }
+    assert!(
+        timeout(Duration::from_millis(50), &mut pending)
+            .await
+            .is_err(),
+        "the unread connection must keep the control write blocked"
+    );
     timeout(Duration::from_secs(2), pool.shutdown())
         .await
         .expect("pool shutdown must bound Close queued behind a stalled write");
@@ -143,13 +149,19 @@ async fn assert_stalled_control_cleanup(cancel_response: bool) {
     }
     let payload =
         json!({"type": "future.control", "data": "x".repeat(16 * 1024 * 1024)}).to_string();
-    let pending = control.send(&payload);
+    let pending = send_control_until_closed(&control, &payload);
     tokio::pin!(pending);
     tokio::select! {
         result = &mut pending => panic!("control write should stall: {result:?}"),
         ready = started_rx => ready.unwrap(),
         () = tokio::time::sleep(Duration::from_secs(5)) => panic!("control write should start"),
     }
+    assert!(
+        timeout(Duration::from_millis(50), &mut pending)
+            .await
+            .is_err(),
+        "the unread connection must keep the control write blocked"
+    );
     if cancel_response {
         drop(stream);
     } else {
