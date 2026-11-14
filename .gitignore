@@ -13,6 +13,11 @@
 # Release artifacts
 /dist/
 
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
 # Runtime data
 /.runtime/
 *.log
@@ -45,6 +50,5 @@ Thumbs.db
 /worktrees/
 /.cargo/
 *.tmp
-/deploy/__pycache__/
 /.buildkit-cache/
 /scratch/
