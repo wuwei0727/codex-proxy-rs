@@ -10,9 +10,12 @@ async fn warmup_obeys_configured_quota_limits() {
         let store = Arc::new(MemoryAccountStore::default());
         let id = "acct_warmup_quota_limit";
         create_account(&store, id).await;
-        store.set_quota_limits(
+        store.set_quota_settings(
             id,
-            serde_json::from_value(json!({"codex:604800s": 80})).unwrap(),
+            serde_json::from_value(json!({
+                "codex:604800s": {"limitPercent": 80, "warmup": null}
+            }))
+            .unwrap(),
         );
         Mock::given(method("GET"))
             .and(path("/api/codex/usage"))

@@ -356,8 +356,13 @@ async fn rewrite_upgrade_and_control_active_response_keep_http_context_until_con
             Arc::new(Lease),
         ),
     );
-    let (trace, mut socket, server) =
-        start_active_response_with(Some(frozen), "/custom/websocket", "codex-tui/0.166.0").await;
+    let (trace, mut socket, server) = start_active_response_with(
+        Some(frozen),
+        "/custom/websocket",
+        "codex-tui/0.166.0",
+        false,
+    )
+    .await;
     // 升级后的默认会话仍持有入口上下文；101 正文结束不再提前取消它
     assert!(
         !plan
@@ -453,9 +458,10 @@ async fn input_plugin_runs_while_a_real_socket_write_is_blocked() {
         ),
     );
     let (trace, mut socket, server) =
-        start_active_response_with(Some(frozen), "/custom/websocket", "codex-tui/0.166.0").await;
+        start_active_response_with(Some(frozen), "/custom/websocket", "codex-tui/0.166.0", true)
+            .await;
     trace.release_terminal.notify_one();
-    // 仅窥视帧头以确认写入开始，不消费 64 MiB 输出，保留真实 TCP 接收窗口背压
+    // 仅窥视帧头确认真实连接已开始输出；测试传输在 64 KiB 后暂停写入，不依赖操作系统缓冲大小
     let MaybeTlsStream::Plain(transport) = socket.get_ref() else {
         panic!("test server must use plain TCP")
     };

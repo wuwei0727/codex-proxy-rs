@@ -1,5 +1,15 @@
 autoInstallPeers: false
 
+# 格式化工具固定了旧补丁版，使用同一小版本的原型污染修复
+overrides:
+  tinypool@2.1.0: 2.1.2
+
+# 仅构建链使用，Vite 构建会拒绝将 picomatch 打入产物，运行镜像不包含 Node
+# 发布修复版后升级并移除此单条例外，不能用于服务端或用户输入的 glob 匹配
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
+
 # Git 依赖通过 prepack 生成产物；信任自有 UI 仓库，实际提交仍由锁文件固定。
 allowBuilds:
   '@codex-proxy/ui@git+https://github.com/zyycn/codex-proxy-ui.git': true

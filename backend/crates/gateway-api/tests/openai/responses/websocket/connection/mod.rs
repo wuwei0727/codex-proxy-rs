@@ -1,5 +1,6 @@
 //! Responses WebSocket 连接生命周期与多轮请求边界测试
 
+mod backpressure;
 mod middleware;
 mod transport;
 
@@ -827,13 +828,14 @@ async fn start_active_response() -> (
     TestClientSocket,
     tokio::task::JoinHandle<()>,
 ) {
-    start_active_response_with(None, "/v1/responses", "integration-test").await
+    start_active_response_with(None, "/v1/responses", "integration-test", false).await
 }
 
 async fn start_active_response_with(
     plan: Option<gateway_core::engine::middleware::FrozenMiddlewarePlan>,
     path: &str,
     user_agent: &str,
+    stall_output: bool,
 ) -> (
     Arc<CrossingLimitTrace>,
     TestClientSocket,
@@ -872,7 +874,7 @@ async fn start_active_response_with(
         .expect("bind WebSocket test server");
     let address = listener.local_addr().expect("test server address");
     let server = tokio::spawn(async move {
-        axum::serve(listener, app)
+        axum::serve(backpressure::TestListener::new(listener, stall_output), app)
             .await
             .expect("serve WebSocket test router");
     });

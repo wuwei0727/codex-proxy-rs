@@ -38,6 +38,8 @@ fn workspace_member_list_matches_the_frozen_dag_scope() {
             Path::new(package["manifest_path"].as_str().expect("package manifest"))
                 .parent()
                 .expect("package directory")
+                .canonicalize()
+                .expect("canonical package directory")
                 .strip_prefix(&root)
                 .expect("workspace member path")
                 .to_path_buf()
@@ -81,6 +83,7 @@ fn core_value_owners_do_not_depend_on_execution_or_routing() {
             "account/selection.rs" => Some(&["account", "concurrency", "identity", "validation"]),
             "concurrency.rs" => Some(&["error"]),
             "account/store.rs" => Some(&["account", "error", "identity", "validation"]),
+            "account/proxy.rs" => Some(&["upstream"]),
             path if path.starts_with("policy/") => {
                 Some(&["account", "identity", "policy", "validation"])
             }
@@ -737,9 +740,13 @@ fn test_source_roots() -> BTreeMap<PathBuf, Vec<String>> {
         let root = Path::new(package["manifest_path"].as_str().expect("package manifest"))
             .parent()
             .expect("package directory")
+            .canonicalize()
+            .expect("canonical package directory")
             .join("tests");
         for target in package["targets"].as_array().expect("Cargo targets") {
-            let source = Path::new(target["src_path"].as_str().expect("target source"));
+            let source = Path::new(target["src_path"].as_str().expect("target source"))
+                .canonicalize()
+                .expect("canonical target source");
             if let Ok(relative) = source.strip_prefix(&root) {
                 roots
                     .entry(root.clone())
@@ -914,7 +921,11 @@ fn dependency_names(member: &str) -> Vec<String> {
         .expect("Cargo packages")
         .iter()
         .find(|package| {
-            Path::new(package["manifest_path"].as_str().expect("package manifest")) == manifest
+            // Cargo 与 Windows 文件系统规范路径可能使用不同前缀，比较前统一形式
+            Path::new(package["manifest_path"].as_str().expect("package manifest"))
+                .canonicalize()
+                .expect("canonical package manifest")
+                == manifest
         })
         .expect("workspace member");
     package["dependencies"]
