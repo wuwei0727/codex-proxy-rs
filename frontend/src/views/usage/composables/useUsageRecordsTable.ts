@@ -39,7 +39,7 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
 
   const filterParams = computed(() => {
     return {
-      accountName: filterAccount.value?.trim() || undefined,
+      accountSearch: filterAccount.value?.trim() || undefined,
       clientApiKeyName: filterKey.value?.trim() || undefined,
       model: filterModel.value?.trim() || undefined,
     }
@@ -83,7 +83,7 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
   function filterChanged() {
     const filter = filterParams.value
     return tableParams.clientApiKeyName !== filter.clientApiKeyName
-      || tableParams.accountName !== filter.accountName
+      || tableParams.accountSearch !== filter.accountSearch
       || tableParams.model !== filter.model
   }
 
