@@ -19,6 +19,7 @@ CONFIG = '''upstream cpr_cluster {
 class RollingTests(unittest.TestCase):
     def updater(self):
         item = Updater('/unused', '/unused', drain=1, ready=1)
+        item.nodes = [('codex-proxy-rs-2', 18081), ('codex-proxy-rs', 18080)]
         item.healthy = Mock(return_value=True)
         item.workers = Mock(return_value={1: 'start'})
         item.configure = Mock()
@@ -26,6 +27,21 @@ class RollingTests(unittest.TestCase):
         item.request_activity = Mock(return_value=None)
         item.recreate = Mock()
         return item
+
+    def test_single_node_upgrades_without_nginx_or_secondary(self):
+        item = self.updater()
+        item.nodes = Updater.nodes
+        item.container = Mock(side_effect=[
+            {'Id': 'initial', 'Image': 'old'},
+            {'Id': 'initial', 'Image': 'old'},
+            {'Id': 'initial', 'Image': 'old'},
+            {'Id': 'new', 'Image': 'new-image'},
+        ])
+        config = '{"services":{"codex-proxy-rs":{"image":"latest"}}}'
+        with patch('rolling_update.run', side_effect=['', config, 'new-image', '3.44.0', '3.43.0', '3.44.0']):
+            item.update()
+        item.recreate.assert_called_once_with('codex-proxy-rs', 'new-image')
+        item.configure.assert_not_called()
 
     def test_schema_transition_rejected_before_mutation(self):
         for current, target in [('3.41.2', '3.42.1'), ('3.42.1', '3.41.2')]:

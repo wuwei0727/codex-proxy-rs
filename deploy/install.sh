@@ -117,6 +117,7 @@ download_release_files() {
     if download "${base_url}/compose.yaml" "$COMPOSE_FILE" 2>/dev/null && \
        download "${base_url}/config.example.yaml" "$CONFIG_EXAMPLE" 2>/dev/null; then
       download "${base_url}/cpr.sh" "${DEPLOY_DIR}/cpr.sh" 2>/dev/null || true
+      download "${base_url}/rolling_update.py" "${DEPLOY_DIR}/rolling_update.py" 2>/dev/null || true
       if grep -q '^name: codex-proxy-rs$' "$COMPOSE_FILE" 2>/dev/null && \
          grep -q '^schema_version:' "$CONFIG_EXAMPLE" 2>/dev/null; then
         return 0
@@ -131,6 +132,7 @@ download_release_files() {
   log "从 main 分支下载配置模板 config.example.yaml"
   download "${base_url}/config.example.yaml" "$CONFIG_EXAMPLE"
   download "${base_url}/cpr.sh" "${DEPLOY_DIR}/cpr.sh" 2>/dev/null || true
+  download "${base_url}/rolling_update.py" "${DEPLOY_DIR}/rolling_update.py" 2>/dev/null || true
 
   grep -q '^name: codex-proxy-rs$' "$COMPOSE_FILE" \
     || die "下载到的 compose.yaml 内容异常。"
@@ -144,6 +146,10 @@ install_cpr_shortcut() {
 
   if [[ ! -f "$cpr_src" ]]; then
     curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/deploy/cpr.sh" -o "$cpr_src" 2>/dev/null || true
+  fi
+
+  if [[ ! -f "${DEPLOY_DIR}/rolling_update.py" ]]; then
+    curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/deploy/rolling_update.py" -o "${DEPLOY_DIR}/rolling_update.py" 2>/dev/null || true
   fi
 
   if [[ -f "$cpr_src" ]]; then

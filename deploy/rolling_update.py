@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""双节点更新：摘流、限时等待目标请求、重建并验证，失败时保留可用节点。"""
+"""固定镜像并验证 CPR 更新，兼容双节点排空逻辑。"""
 import argparse
 import json
 import os
@@ -40,7 +40,7 @@ def disabled_config(text, port):
 
 
 class Updater:
-    nodes = [('codex-proxy-rs-2', 18081), ('codex-proxy-rs', 18080)]
+    nodes = [('codex-proxy-rs', 18080)]
 
     def __init__(self, install, nginx, drain=60, ready=300):
         self.install = Path(install)
@@ -169,13 +169,19 @@ class Updater:
         return json.loads(run('docker', 'inspect', cid))[0]
 
     def preflight(self):
+        if len(self.nodes) == 1:
+            service, port = self.nodes[0]
+            self.container(service)
+            if not self.healthy(port):
+                raise RuntimeError(f'{service} 不健康，停止升级')
+            return None
         original = self.nginx.read_text()
         self.expected_config = original
         for service, port in self.nodes:
             disabled_config(original, port)
             self.container(service)
             if not self.healthy(port):
-                raise RuntimeError(f'{service} 不健康，请先恢复双节点，再执行滚动更新')
+                raise RuntimeError(f'{service} 不健康，停止升级')
             state = self.request_activity(service)
             if state is None:
                 self.target_connections(port)
@@ -267,7 +273,7 @@ class Updater:
     def update(self, check=False):
         original = self.preflight()
         if check:
-            print('预检通过：双节点健康、Nginx 配置及排空探测正常；未修改服务')
+            print('预检通过：CPR 健康，未修改服务')
             return
         run(*self.compose, 'pull', *(s for s, _ in self.nodes))
         config = json.loads(run(*self.compose, 'config', '--format', 'json'))
@@ -284,7 +290,23 @@ class Updater:
             if self.container(service)['Image'] == image:
                 print(f'{service} 已运行目标镜像，跳过重建', flush=True)
                 continue
-            self.update_node(service, port, image, version, original)
+            if len(self.nodes) > 1:
+                self.update_node(service, port, image, version, original)
+                continue
+            print('正在升级单节点，服务会短暂中断', flush=True)
+            self.recreate(service, image)
+            deadline = time.monotonic() + self.ready_timeout
+            while time.monotonic() < deadline:
+                if self.healthy(port):
+                    current = self.container(service)
+                    actual = run('docker', 'exec', current['Id'], '/app/bin/codex-proxy-rs', '--version')
+                    if current['Image'] == image and actual == version:
+                        print(f'{service} 升级通过健康检查，版本 {version}', flush=True)
+                        break
+                    raise RuntimeError('运行镜像或版本与预检不一致')
+                time.sleep(2)
+            else:
+                raise RuntimeError('单节点启动检查超时，请检查 cpr logs')
 
 
 def main():

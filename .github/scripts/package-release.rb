@@ -29,6 +29,7 @@ module ReleasePackage
     FileUtils.rm_rf('package')
     config = 'deploy/config.example.yaml'
     FileUtils.cp(config, release_dir)
+    FileUtils.cp(%w[deploy/cpr.sh deploy/rolling_update.py], release_dir)
     compose = File.read('deploy/compose.yaml')
     image = "#{ENV.fetch('REGISTRY')}/#{ENV.fetch('IMAGE_NAME')}"
     default_image = "${CPR_IMAGE:-#{image}:latest}"

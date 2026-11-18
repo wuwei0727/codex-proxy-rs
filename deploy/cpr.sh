@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex Proxy 快捷运维管理工具 (cpr) - 双实例滚动更新版
+# Codex Proxy 快捷运维管理工具 (cpr) - 单节点版
 
 INSTALL_DIR="${CPR_INSTALL_DIR:-/opt/codex-proxy-rs}"
 
@@ -42,7 +42,7 @@ check_env() {
 
 cpr_status() {
   check_env
-  echo -e "${CYAN}==> 容器运行状态 (双实例高可用集群)：${NC}"
+  echo -e "${CYAN}==> 容器运行状态 (单节点)：${NC}"
   docker compose -f "$COMPOSE_FILE" ps
 }
 
@@ -51,16 +51,14 @@ cpr_logs() {
   local target="${1:-codex-proxy-rs}"
   if [[ "$target" == "1" ]]; then
     target="codex-proxy-rs"
-  elif [[ "$target" == "2" ]]; then
-    target="codex-proxy-rs-2"
   fi
 
   if [[ "$target" == "all" ]]; then
     echo -e "${CYAN}==> 查看全部服务实时日志 (Ctrl+C 退出)...${NC}"
     docker compose -f "$COMPOSE_FILE" logs -f --tail=100
   elif [[ "$target" == "cpr" ]]; then
-    echo -e "${CYAN}==> 查看双节点实时日志 (Ctrl+C 退出)...${NC}"
-    docker compose -f "$COMPOSE_FILE" logs -f --tail=100 codex-proxy-rs codex-proxy-rs-2
+    echo -e "${CYAN}==> 查看应用实时日志 (Ctrl+C 退出)...${NC}"
+    docker compose -f "$COMPOSE_FILE" logs -f --tail=100 codex-proxy-rs
   else
     echo -e "${CYAN}==> 查看 ${target} 实时日志 (Ctrl+C 退出)...${NC}"
     docker compose -f "$COMPOSE_FILE" logs -f --tail=100 "$target"
@@ -72,13 +70,10 @@ cpr_restart() {
   local target="${1:-}"
   if [[ -n "$target" ]]; then
     if [[ "$target" == "1" ]]; then target="codex-proxy-rs"; fi
-    if [[ "$target" == "2" ]]; then target="codex-proxy-rs-2"; fi
     echo -e "${CYAN}==> 正在重启 ${target}...${NC}"
     docker compose -f "$COMPOSE_FILE" restart "$target"
   else
-    echo -e "${CYAN}==> 依次重启双节点（不等待连接排空）...${NC}"
-    docker compose -f "$COMPOSE_FILE" restart codex-proxy-rs-2
-    sleep 3
+    echo -e "${CYAN}==> 重启 CPR...${NC}"
     docker compose -f "$COMPOSE_FILE" restart codex-proxy-rs
   fi
   echo -e "${GREEN}==> 重启完成！${NC}"
@@ -86,14 +81,14 @@ cpr_restart() {
 
 cpr_start() {
   check_env
-  echo -e "${CYAN}==> 正在启动服务集群...${NC}"
+  echo -e "${CYAN}==> 正在启动服务...${NC}"
   docker compose -f "$COMPOSE_FILE" up -d
   echo -e "${GREEN}==> 启动完成！${NC}"
 }
 
 cpr_stop() {
   check_env
-  echo -e "${CYAN}==> 正在停止服务集群...${NC}"
+  echo -e "${CYAN}==> 正在停止服务...${NC}"
   docker compose -f "$COMPOSE_FILE" stop
   echo -e "${GREEN}==> 服务已停止！${NC}"
 }
@@ -111,7 +106,7 @@ cpr_info() {
   local ip
   ip=$(curl -s4 ifconfig.me 2>/dev/null || curl -s4 api.ipify.org 2>/dev/null || echo "127.0.0.1")
   echo -e "公网域名访问：  ${CYAN}https://cpr.ranran0112.ccwu.cc${NC}"
-  echo -e "本地集群端口：  节点1 -> 18080，节点2 -> 18081"
+  echo -e "本地服务端口：  127.0.0.1:18080"
   echo -e "管理员用户名：  ${CYAN}admin@cpr.local${NC}"
   
   if [[ -f "$CONFIG_FILE" ]]; then
@@ -131,16 +126,14 @@ cpr_info() {
 show_menu() {
   clear
   echo -e "${GREEN}=============================================${NC}"
-  echo -e "${GREEN}    Codex Proxy 快捷管理菜单 (高可用双实例)   ${NC}"
+  echo -e "${GREEN}    Codex Proxy 快捷管理菜单 (单节点)   ${NC}"
   echo -e "${GREEN}=============================================${NC}"
-  echo -e " ${GREEN}1.${NC} 查看集群运行状态"
-  echo -e " ${GREEN}2.${NC} 查看实时日志 (节点1)"
-  echo -e " ${GREEN}3.${NC} 查看实时日志 (节点2)"
-  echo -e " ${GREEN}4.${NC} 查看双节点合并实时日志"
-  echo -e " ${GREEN}5.${NC} 重启集群"
-  echo -e " ${GREEN}6.${NC} 启动集群"
-  echo -e " ${GREEN}7.${NC} 停止集群"
-  echo -e " ${GREEN}8.${NC} 安全滚动升级 (等待旧连接结束)"
+  echo -e " ${GREEN}1.${NC} 查看服务运行状态"
+  echo -e " ${GREEN}2.${NC} 查看应用实时日志"
+  echo -e " ${GREEN}5.${NC} 重启服务"
+  echo -e " ${GREEN}6.${NC} 启动服务"
+  echo -e " ${GREEN}7.${NC} 停止服务"
+  echo -e " ${GREEN}8.${NC} 单节点升级 (短暂中断)"
   echo -e " ${GREEN}9.${NC} 查看登录地址与管理员密码"
   echo -e " ${GREEN}0.${NC} 退出菜单"
   echo -e "${GREEN}=============================================${NC}"
@@ -148,8 +141,6 @@ show_menu() {
   case "$choice" in
     1) cpr_status ;;
     2) cpr_logs "1" ;;
-    3) cpr_logs "2" ;;
-    4) cpr_logs "cpr" ;;
     5) cpr_restart ;;
     6) cpr_start ;;
     7) cpr_stop ;;
@@ -187,12 +178,12 @@ case "${1:-}" in
     echo ""
     echo "可用命令:"
     echo "  cpr          打开交互式菜单"
-    echo "  cpr status   查看集群运行状态"
-    echo "  cpr logs [1|2|cpr|all] 查看日志"
-    echo "  cpr restart  平滑滚动重启"
+    echo "  cpr status   查看服务运行状态"
+    echo "  cpr logs [1|cpr|all] 查看日志"
+    echo "  cpr restart  重启 CPR"
     echo "  cpr start    启动所有服务"
     echo "  cpr stop     停止所有服务"
-    echo "  cpr update   安全双节点滚动升级（--check 仅预检）"
+    echo "  cpr update   单节点升级（--check 仅预检）"
     echo "  cpr info     查看后台地址与管理员账号密码"
     ;;
   *)
