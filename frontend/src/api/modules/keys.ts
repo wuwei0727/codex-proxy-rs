@@ -14,6 +14,7 @@ export interface ApiKeyPeerSharing {
 }
 
 export interface ApiKey {
+  modelMappings: Record<string, string>
   peerSharing: ApiKeyPeerSharing
   providerRequestProfileOverrides: ProviderRequestProfiles
   openaiClientProfileOverride: ClientProfileSelection | null
@@ -79,6 +80,7 @@ interface ApiKeyListParams {
 }
 
 export interface ApiKeyWriteParam {
+  modelMappings: Record<string, string>
   peerSharing: ApiKeyPeerSharing
   name: string
   label: string | null

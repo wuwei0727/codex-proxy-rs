@@ -1120,6 +1120,7 @@ impl ClientKeyStore for MemoryClientKeyStore {
         let now = Utc::now();
         Ok(Some(ClientKeySecret::new(
             ClientKeyRecord {
+                model_mappings: Default::default(),
                 peer_sharing: Default::default(),
                 request_profile_overrides: Default::default(),
                 budget: Default::default(),

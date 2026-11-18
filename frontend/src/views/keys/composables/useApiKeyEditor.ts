@@ -8,6 +8,7 @@ import { t } from '@/i18n'
 import { notification as ZNotification } from '@/utils/notification'
 
 export interface ApiKeyFormValue {
+  modelMappings: Array<{ requestedModel: string, upstreamModel: string }>
   peerSharing: ApiKeyPeerSharing
   providerRequestProfileOverrides: ProviderRequestProfiles
   installationSeed: string
@@ -51,6 +52,7 @@ export function useApiKeyEditor(options: {
     else if (openai)
       delete openai.installationSeed
     form.value = {
+      modelMappings: Object.entries(key.modelMappings ?? {}).map(([requestedModel, upstreamModel]) => ({ requestedModel, upstreamModel })),
       peerSharing: { ...key.peerSharing },
       providerRequestProfileOverrides: profiles,
       installationSeed,
@@ -88,6 +90,10 @@ export function useApiKeyEditor(options: {
     await savingKeyAction.run(
       async () => {
         const payload = {
+          modelMappings: Object.fromEntries(form.value.modelMappings.map(row => [
+            row.requestedModel.trim(),
+            row.upstreamModel.trim(),
+          ])),
           peerSharing: { ...form.value.peerSharing },
           name: form.value.name.trim(),
           label: form.value.label.trim() || null,
@@ -167,6 +173,7 @@ export function useApiKeyEditor(options: {
 
 function emptyForm(): ApiKeyFormValue {
   return {
+    modelMappings: [],
     peerSharing: {
       enabled: false,
       sharePool: false,

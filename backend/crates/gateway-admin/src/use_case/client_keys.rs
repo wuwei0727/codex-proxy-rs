@@ -208,6 +208,7 @@ impl ClientKeyService for DefaultClientKeyService {
                 .and_then(|provider| provider.preview_key_client_profile(profile, None))
                 .map_err(|error| super::map_provider_error(error, "client profile"))?;
         }
+        validate_key_model_mappings(&command.model_mappings)?;
         validate_peer_sharing(command.peer_sharing, &command.group_ids)?;
         let id = ClientApiKeyId::new(format!("key_{}", Uuid::now_v7().simple()))
             .map_err(|_| AdminError::internal("创建 Client API Key ID 失败"))?;
@@ -220,6 +221,7 @@ impl ClientKeyService for DefaultClientKeyService {
             .store
             .create_client_key(
                 NewClientKey {
+                    model_mappings: command.model_mappings,
                     peer_sharing: command.peer_sharing,
                     request_profile_overrides: command.request_profile_overrides,
                     id,
@@ -255,6 +257,9 @@ impl ClientKeyService for DefaultClientKeyService {
                     .and_then(|provider| provider.preview_key_client_profile(profile, None))
                     .map_err(|error| super::map_provider_error(error, "client profile"))?;
             }
+        }
+        if let Some(mappings) = &command.model_mappings {
+            validate_key_model_mappings(mappings)?;
         }
         if let Some(sharing) = command.peer_sharing {
             validate_peer_sharing(sharing, &command.group_ids)?;
@@ -355,6 +360,24 @@ pub(super) fn generate_key() -> String {
     let mut bytes = [0_u8; 32];
     OsRng.fill_bytes(&mut bytes);
     format!("sk_{}", URL_SAFE_NO_PAD.encode(bytes))
+}
+
+fn validate_key_model_mappings(
+    mappings: &std::collections::BTreeMap<String, String>,
+) -> Result<(), AdminError> {
+    use gateway_core::routing::{PublicModelId, UpstreamModelId};
+
+    crate::model::settings::validate_model_mappings(
+        mappings.iter().map(|(k, v)| (k.as_str(), v.as_str())),
+    )
+    .map_err(|_| AdminError::invalid("API Key 模型映射不合法"))?;
+    for (requested, upstream) in mappings {
+        PublicModelId::new(requested.clone())
+            .map_err(|_| AdminError::invalid("请求模型 ID 不合法"))?;
+        UpstreamModelId::new(upstream.clone())
+            .map_err(|_| AdminError::invalid("上游模型 ID 不合法"))?;
+    }
+    Ok(())
 }
 
 fn validate_peer_sharing(

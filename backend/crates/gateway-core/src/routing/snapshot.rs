@@ -30,6 +30,7 @@ type ModelCatalogAccounts = BTreeMap<ProviderKind, BTreeMap<String, BTreeSet<Pro
 /// Store 读取到的一个启用 Client API Key 策略事实
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnapshotClientPolicyFacts {
+    model_mappings: BTreeMap<String, String>,
     peer_sharing: ClientPeerSharing,
     name_snapshot: Option<String>,
     request_profiles: BTreeMap<ProviderKind, crate::account::OpaqueProviderData>,
@@ -40,6 +41,12 @@ pub struct SnapshotClientPolicyFacts {
 }
 
 impl SnapshotClientPolicyFacts {
+    #[must_use]
+    pub fn with_model_mappings(mut self, mappings: BTreeMap<String, String>) -> Self {
+        self.model_mappings = mappings;
+        self
+    }
+
     #[must_use]
     pub const fn with_peer_sharing(mut self, sharing: ClientPeerSharing) -> Self {
         self.peer_sharing = sharing;
@@ -69,6 +76,7 @@ impl SnapshotClientPolicyFacts {
         limits: RateLimits,
     ) -> Self {
         Self {
+            model_mappings: BTreeMap::new(),
             peer_sharing: ClientPeerSharing::default(),
             key_id,
             name_snapshot: None,
@@ -604,6 +612,7 @@ async fn compile_runtime_snapshot(
                 policy.limits,
             )
             .with_name_snapshot(policy.name_snapshot)
+            .with_model_mappings(policy.model_mappings)
             .with_peer_sharing(policy.peer_sharing),
         );
     }
@@ -628,6 +637,7 @@ async fn compile_runtime_snapshot(
 /// 数据面使用的不可变配置快照
 #[derive(Debug, Clone)]
 pub struct RuntimeSnapshot {
+    client_model_mappings: Arc<BTreeMap<String, String>>,
     settings: Arc<CompiledSettings>,
     privacy_compiler: Option<Arc<dyn crate::settings::privacy::PrivacyPolicyCompiler>>,
     extensions: Option<crate::routing::extensions::ExtensionSetReference>,
@@ -644,6 +654,20 @@ pub struct RuntimeSnapshot {
 }
 
 impl RuntimeSnapshot {
+    /// 鉴权与请求重绑均从当前身份取覆盖，切换 Key 后不继承原身份的映射
+    pub(crate) fn for_client(self: &Arc<Self>, policy: &ClientPolicy) -> Arc<Self> {
+        let mappings = policy.model_mappings();
+        if Arc::ptr_eq(&self.client_model_mappings, mappings)
+            || (self.client_model_mappings.is_empty() && mappings.is_empty())
+        {
+            return self.clone();
+        }
+        Arc::new(Self {
+            client_model_mappings: mappings.clone(),
+            ..self.as_ref().clone()
+        })
+    }
+
     /// 设置事实与编译结果共享快照寿命，读取时不从执行策略反向拼装
     #[must_use]
     pub fn settings(&self) -> &SettingsValues {
@@ -707,7 +731,8 @@ impl RuntimeSnapshot {
         scope: &FrozenAccountScope,
     ) -> impl Iterator<Item = &super::ContributedModel> {
         self.contributed_models().iter().filter(move |model| {
-            &model.provider == provider
+            self.client_model_target(model.id.as_str()) == model.id.as_str()
+                && &model.provider == provider
                 && model.accounts.iter().any(|account| {
                     scope.account_provider(account) == Some(provider)
                         && scope.allows_model(account, &self.mapped_model(model.id.as_str()))
@@ -715,7 +740,16 @@ impl RuntimeSnapshot {
         })
     }
 
+    fn client_model_target<'a>(&'a self, requested: &'a str) -> &'a str {
+        self.client_model_mappings
+            .get(requested)
+            .map_or(requested, String::as_str)
+    }
+
     fn model_alias(&self, model: &str) -> Option<&super::ContributedModelAlias> {
+        if self.client_model_mappings.contains_key(model) {
+            return None;
+        }
         self.model_aliases()
             .iter()
             .find(|alias| alias.id.as_str() == model)
@@ -819,6 +853,7 @@ impl RuntimeSnapshot {
         let settings = CompiledSettings::new(values, privacy_compiler.as_deref(), None)
             .map_err(|_| RoutingError::InvalidSettings)?;
         Ok(Self {
+            client_model_mappings: Arc::default(),
             settings: Arc::new(settings),
             privacy_compiler,
             extensions: None,
@@ -899,12 +934,16 @@ impl RuntimeSnapshot {
                 .values
                 .model_mappings
                 .keys()
+                .chain(self.client_model_mappings.keys())
                 .filter_map(|model| PublicModelId::new(model.clone()).ok()),
         );
         models.extend(
             self.model_aliases()
                 .iter()
-                .filter(|alias| &alias.provider == provider)
+                .filter(|alias| {
+                    &alias.provider == provider
+                        && !self.client_model_mappings.contains_key(alias.id.as_str())
+                })
                 .map(|alias| alias.id.clone()),
         );
         models.extend(
@@ -931,7 +970,13 @@ impl RuntimeSnapshot {
                 profiles.insert(public_model, presentation.clone());
             }
         }
-        for alias in self.settings.values.model_mappings.keys() {
+        for alias in self
+            .settings
+            .values
+            .model_mappings
+            .keys()
+            .chain(self.client_model_mappings.keys())
+        {
             let target = self.mapped_model(alias);
             let Some(presentation) = presentations.iter().find_map(|(model, presentation)| {
                 (model.as_str() == target).then_some(presentation)
@@ -942,11 +987,10 @@ impl RuntimeSnapshot {
                 profiles.insert(public_model, presentation.clone());
             }
         }
-        for alias in self
-            .model_aliases()
-            .iter()
-            .filter(|alias| &alias.provider == provider)
-        {
+        for alias in self.model_aliases().iter().filter(|alias| {
+            &alias.provider == provider
+                && !self.client_model_mappings.contains_key(alias.id.as_str())
+        }) {
             if let Some(presentation) = presentations.get(&alias.target) {
                 profiles.insert(alias.id.clone(), presentation.clone());
             }
@@ -1049,15 +1093,14 @@ impl RuntimeSnapshot {
         self.provider_models
             .get(provider)
             .is_some_and(|models| models.contains_key(&upstream_model))
-            || self
-                .contributed_models()
-                .iter()
-                .any(|model| &model.provider == provider && &model.id == public_model)
+            || self.contributed_models().iter().any(|model| {
+                &model.provider == provider
+                    && model.id.as_str() == self.client_model_target(public_model.as_str())
+            })
             || (!self.exhaustive_provider_catalogs.contains(provider)
-                && !self
-                    .contributed_models()
-                    .iter()
-                    .any(|model| &model.id == public_model)
+                && !self.contributed_models().iter().any(|model| {
+                    model.id.as_str() == self.client_model_target(public_model.as_str())
+                })
                 && !self.is_known_upstream_model(&upstream_model))
     }
 
@@ -1087,13 +1130,13 @@ impl RuntimeSnapshot {
             .is_some_and(|models| models.contains_key(&upstream));
         // 仅由适配器贡献的模型仍受声明账号范围限制，不能借发现型目录扩大资格
         native
-            || !self
-                .contributed_models()
-                .iter()
-                .any(|model| &model.provider == provider && &model.id == public_model)
+            || !self.contributed_models().iter().any(|model| {
+                &model.provider == provider
+                    && model.id.as_str() == self.client_model_target(public_model.as_str())
+            })
             || self.contributed_models().iter().any(|model| {
                 &model.provider == provider
-                    && &model.id == public_model
+                    && model.id.as_str() == self.client_model_target(public_model.as_str())
                     && model.accounts.contains(account)
             })
     }
@@ -1129,7 +1172,7 @@ impl RuntimeSnapshot {
         self.native_catalog_model_allowed_for_scope(provider, public_model, scope)
             || self.contributed_models().iter().any(|model| {
                 &model.provider == provider
-                    && &model.id == public_model
+                    && model.id.as_str() == self.client_model_target(public_model.as_str())
                     && model.accounts.iter().any(|account| {
                         scope.account_provider(account) == Some(provider)
                             && scope
@@ -1159,10 +1202,10 @@ impl RuntimeSnapshot {
                 let native = self.provider_models.get(provider).is_some_and(|models| {
                     models.keys().any(|model| model.as_str() == upstream_model)
                 });
-                let contributed = self
-                    .contributed_models()
-                    .iter()
-                    .any(|model| &model.provider == provider && &model.id == public_model);
+                let contributed = self.contributed_models().iter().any(|model| {
+                    &model.provider == provider
+                        && model.id.as_str() == self.client_model_target(public_model.as_str())
+                });
                 (native || !contributed) && scope.allows_provider_model(provider, &upstream_model)
             }
         }
@@ -1170,6 +1213,9 @@ impl RuntimeSnapshot {
 
     #[must_use]
     pub fn mapped_model(&self, requested: &str) -> String {
+        if let Some(upstream) = self.client_model_mappings.get(requested) {
+            return upstream.clone();
+        }
         if let Some(alias) = self.model_alias(requested) {
             return alias.target.as_str().to_owned();
         }
@@ -1278,6 +1324,7 @@ impl RuntimeSnapshot {
             .values
             .model_mappings
             .contains_key(requested_model)
+            || self.client_model_mappings.contains_key(requested_model)
             || self.model_alias(requested_model).is_some()
         {
             UpstreamModelId::new(mapped_model)
@@ -1290,7 +1337,7 @@ impl RuntimeSnapshot {
             || self
                 .contributed_models()
                 .iter()
-                .any(|model| &model.id == public_model);
+                .any(|model| model.id.as_str() == self.client_model_target(public_model.as_str()));
 
         let providers = context.required_provider.as_ref().map_or_else(
             || account_scope.provider_kinds().clone(),
@@ -1327,7 +1374,10 @@ impl RuntimeSnapshot {
             let contributions: Vec<_> = self
                 .contributed_models()
                 .iter()
-                .filter(|model| &model.provider == provider && &model.id == public_model)
+                .filter(|model| {
+                    &model.provider == provider
+                        && model.id.as_str() == self.client_model_target(public_model.as_str())
+                })
                 .collect();
             let mut candidate_scope = Arc::clone(&account_scope);
             let emulated_features = if contributions.is_empty() {

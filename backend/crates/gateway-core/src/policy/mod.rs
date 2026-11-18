@@ -122,6 +122,7 @@ pub struct ClientSettings {
 /// 从 `client_api_keys` 冻结的公开准入事实
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientPolicy {
+    model_mappings: Arc<BTreeMap<String, String>>,
     peer_sharing: ClientPeerSharing,
     name_snapshot: Option<String>,
     defaults: Arc<ClientSettings>,
@@ -133,6 +134,16 @@ pub struct ClientPolicy {
 }
 
 impl ClientPolicy {
+    #[must_use]
+    pub fn with_model_mappings(mut self, mappings: BTreeMap<String, String>) -> Self {
+        self.model_mappings = Arc::new(mappings);
+        self
+    }
+
+    pub(crate) fn model_mappings(&self) -> &Arc<BTreeMap<String, String>> {
+        &self.model_mappings
+    }
+
     #[must_use]
     pub fn defaults(&self) -> &Arc<ClientSettings> {
         &self.defaults
@@ -168,6 +179,7 @@ impl ClientPolicy {
         limits: RateLimits,
     ) -> Self {
         Self {
+            model_mappings: Arc::default(),
             peer_sharing: ClientPeerSharing::default(),
             name_snapshot: None,
             defaults: Arc::new(ClientSettings {

@@ -469,7 +469,7 @@ Client Key 鉴权完成后，API adapter 从有界请求头识别客户端，Cor
 - 跨 Provider 只在账号范围和能力都允许，且请求尚未到达上游或已被证明可安全重放时发生
 - 观测写入失败不能替换已经确定的客户端协议结果
 
-生成请求按模型目录编译候选；全局模型映射是精确映射，未命中时模型名原样交给候选 Provider。
+生成请求按模型目录编译候选；鉴权后的请求快照优先采用当前 Key 的精确映射目标，未命中时沿用插件别名和全局映射，最终未命中的模型名原样交给候选 Provider。
 Responses 与 Messages 保留各自的协议正文进入共用 Generate 执行链；Chat 在 API 层规范化为 Responses，
 回程再投影成 Chat JSON 或 SSE。HTTP 中间件位于入口转换外侧，request 与 attempt 中间件处理该逻辑协议正文，
 实际 endpoint 保留客户端路由。Provider 选定账号后按账号协议转换出站，`outbound` 处理实际发送的上游请求

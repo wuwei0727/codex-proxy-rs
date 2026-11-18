@@ -220,6 +220,7 @@ impl DefaultExecutionService {
             .cloned()
             .ok_or(ClientAuthenticationError::InvalidKey)?;
         let policy = RequestSettings::new(snapshot.clone()).apply_policy(policy);
+        let snapshot = snapshot.for_client(&policy);
         Ok(AuthenticatedClient {
             settings: None,
             snapshot,
@@ -276,6 +277,7 @@ impl DefaultExecutionService {
             Some(settings) => settings.apply_policy(policy),
             None => RequestSettings::new(snapshot.clone()).apply_policy(policy),
         };
+        let snapshot = snapshot.for_client(&policy);
         Ok(AuthenticatedClient {
             settings: authentication.take_settings(),
             snapshot,
@@ -1107,6 +1109,7 @@ impl DefaultExecutionService {
                 "Client API key is disabled.",
             )
         })?;
+        let snapshot = snapshot.for_client(&policy);
         Ok(AuthenticatedClient {
             policy: match &settings {
                 Some(settings) => settings.apply_policy(policy),

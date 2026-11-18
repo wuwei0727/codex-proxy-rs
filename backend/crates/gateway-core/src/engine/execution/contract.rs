@@ -200,7 +200,7 @@ impl PreparedRootExecution {
                 )
             })?;
         self.client.policy = settings.apply_policy(self.client.policy.clone());
-        self.client.snapshot = settings.snapshot();
+        self.client.snapshot = settings.snapshot().for_client(&self.client.policy);
         self.client.settings = Some(settings.clone());
         self.deadline_at = deadline;
         Ok(())

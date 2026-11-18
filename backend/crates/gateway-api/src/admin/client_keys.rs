@@ -153,6 +153,8 @@ impl ClientKeySort {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateClientKeyRequest {
     #[serde(default)]
+    model_mappings: BTreeMap<String, String>,
+    #[serde(default)]
     peer_sharing: gateway_core::policy::ClientPeerSharing,
     #[serde(default)]
     provider_request_profile_overrides: ProviderRequestProfileOverrides,
@@ -192,6 +194,7 @@ impl CreateClientKeyRequest {
             self.xai_client_profile_override,
         )?;
         Ok(CreateClientKey {
+            model_mappings: self.model_mappings,
             peer_sharing: self.peer_sharing,
             request_profile_overrides,
             custom_key: self
@@ -220,6 +223,7 @@ impl CreateClientKeyRequest {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateClientKeyRequest {
+    model_mappings: Option<BTreeMap<String, String>>,
     peer_sharing: Option<gateway_core::policy::ClientPeerSharing>,
     #[serde(default)]
     provider_request_profile_overrides: ProviderRequestProfileOverrideUpdates,
@@ -252,6 +256,7 @@ impl UpdateClientKeyRequest {
             self.xai_client_profile_override,
         )?;
         Ok(UpdateClientKey {
+            model_mappings: self.model_mappings,
             peer_sharing: self.peer_sharing,
             request_profile_override_updates,
             id: client_key_id(self.id, "clientKeyMutationNotFound")?,
@@ -339,6 +344,7 @@ impl ClientKeyMutationRequest {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientKeyView {
+    model_mappings: BTreeMap<String, String>,
     peer_sharing: gateway_core::policy::ClientPeerSharing,
     provider_request_profile_overrides: ProviderRequestProfileOverrides,
     /// 固定兼容字段；值始终从 provider_request_profile_overrides 派生
@@ -392,6 +398,7 @@ impl From<(ClientKeyRecord, crate::time::TimePresenter)> for ClientKeyView {
                 .cloned(),
             xai_client_profile_override: provider_request_profile_overrides.get("xai").cloned(),
             provider_request_profile_overrides,
+            model_mappings: record.model_mappings,
             peer_sharing: record.peer_sharing,
             id: record.id.to_string(),
             name: record.name,

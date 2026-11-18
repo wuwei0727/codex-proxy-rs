@@ -167,6 +167,7 @@ async fn deleting_a_key_preserves_its_ledger_and_settles_inflight_requests_once(
             name: "original".into(),
             label: None,
             group_ids: Vec::new(),
+            model_mappings: Default::default(),
             peer_sharing: Default::default(),
             request_profile_overrides: Default::default(),
             limits: RateLimits::unlimited(),
@@ -794,6 +795,7 @@ async fn budget_updates_preserve_omitted_limits_and_do_not_clear_usage() {
         .await
         .unwrap();
     let update = UpdateClientKey {
+        model_mappings: None,
         peer_sharing: None,
         request_profile_override_updates: Default::default(),
         id: ClientApiKeyId::new("key").unwrap(),
@@ -814,6 +816,7 @@ async fn budget_updates_preserve_omitted_limits_and_do_not_clear_usage() {
     admin
         .update_client_key(
             UpdateClientKey {
+                model_mappings: None,
                 peer_sharing: None,
                 request_profile_override_updates: Default::default(),
                 daily_limit_usd: None,
@@ -839,6 +842,7 @@ async fn budget_updates_preserve_omitted_limits_and_do_not_clear_usage() {
     admin
         .update_client_key(
             UpdateClientKey {
+                model_mappings: None,
                 peer_sharing: None,
                 request_profile_override_updates: Default::default(),
                 daily_limit_usd: Some("0".parse().unwrap()),

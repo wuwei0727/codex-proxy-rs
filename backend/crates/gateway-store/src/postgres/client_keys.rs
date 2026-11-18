@@ -53,6 +53,7 @@ const CLIENT_API_KEY_LAST_USED_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientApiKeySnapshot {
+    pub model_mappings: BTreeMap<String, String>,
     pub peer_sharing: ClientPeerSharing,
     pub name_snapshot: Option<String>,
     pub request_profiles: std::collections::BTreeMap<
@@ -74,6 +75,7 @@ impl ClientApiKeySnapshot {
         requests_per_minute: i64,
     ) -> StoreResult<Self> {
         Ok(Self {
+            model_mappings: Default::default(),
             peer_sharing: ClientPeerSharing::default(),
             name_snapshot: None,
             request_profiles: std::collections::BTreeMap::new(),
@@ -120,6 +122,7 @@ impl fmt::Debug for ClientApiKeySecret {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientApiKeyRecord {
+    pub model_mappings: BTreeMap<String, String>,
     pub peer_sharing: ClientPeerSharing,
     pub request_profile_overrides: BTreeMap<ProviderKind, OpaqueProviderData>,
     pub id: String,
@@ -283,6 +286,7 @@ pub struct ClientApiKeyPage {
 
 #[derive(Clone)]
 pub struct NewClientApiKey {
+    pub model_mappings: BTreeMap<String, String>,
     pub peer_sharing: ClientPeerSharing,
     pub request_profile_overrides: BTreeMap<ProviderKind, OpaqueProviderData>,
     pub id: String,
@@ -321,6 +325,7 @@ impl NewClientApiKey {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateClientApiKeyDetails {
+    pub model_mappings: Option<BTreeMap<String, String>>,
     pub peer_sharing: Option<ClientPeerSharing>,
     pub request_profile_override_updates: BTreeMap<ProviderKind, Option<OpaqueProviderData>>,
     pub id: String,
@@ -387,7 +392,7 @@ impl ClientApiKeyRepository for PgClientApiKeyRepository {
         query.validate()?;
         let total = count_client_api_keys(&self.pool, query.search.as_deref()).await?;
         let mut statement = QueryBuilder::<Postgres>::new(
-            "select k.id, k.name, k.label, k.peer_sharing_json, k.provider_request_profiles_json as request_profile_overrides,
+            "select k.id, k.name, k.label, k.model_mappings_json, k.peer_sharing_json, k.provider_request_profiles_json as request_profile_overrides,
                     left(k.key, least(10, length(k.key) / 2)) as prefix, k.enabled,
                     k.max_concurrency, k.requests_per_minute, k.last_used_at,
                     (select mr.started_at from model_requests mr where mr.client_api_key_ref = k.id order by mr.started_at desc, mr.id desc limit 1) as last_model_request_at, k.created_at,
@@ -448,7 +453,7 @@ impl ClientApiKeyRepository for PgClientApiKeyRepository {
     async fn get_client_api_key(&self, id: &str) -> StoreResult<Option<ClientApiKeyRecord>> {
         require_nonempty(ENTITY, "id", id)?;
         let record = sqlx::query(
-            "select k.id, k.name, k.label, k.peer_sharing_json, k.provider_request_profiles_json as request_profile_overrides,
+            "select k.id, k.name, k.label, k.model_mappings_json, k.peer_sharing_json, k.provider_request_profiles_json as request_profile_overrides,
                     left(k.key, least(10, length(k.key) / 2)) as prefix, k.enabled,
                     k.max_concurrency, k.requests_per_minute, k.last_used_at,
                     (select mr.started_at from model_requests mr where mr.client_api_key_ref = k.id order by mr.started_at desc, mr.id desc limit 1) as last_model_request_at, k.created_at,
@@ -917,6 +922,7 @@ impl ClientKeyStore for PgAdminClientKeyStore {
             .control_plane
             .create_client_api_key(
                 NewClientApiKey {
+                    model_mappings: command.model_mappings,
                     peer_sharing: command.peer_sharing,
                     request_profile_overrides: command.request_profile_overrides,
                     id: id.as_str().to_owned(),
@@ -948,6 +954,7 @@ impl ClientKeyStore for PgAdminClientKeyStore {
                         "weekly_limit_usd",
                         "provider_request_profiles_json",
                         "peer_sharing_json",
+                        "model_mappings_json",
                     ]
                     .into_iter()
                     .map(str::to_owned)
@@ -969,6 +976,7 @@ impl ClientKeyStore for PgAdminClientKeyStore {
             .control_plane
             .update_client_api_key(
                 UpdateClientApiKeyDetails {
+                    model_mappings: command.model_mappings,
                     peer_sharing: command.peer_sharing,
                     request_profile_override_updates: command.request_profile_override_updates,
                     id: id.as_str().to_owned(),
@@ -998,6 +1006,7 @@ impl ClientKeyStore for PgAdminClientKeyStore {
                         "weekly_limit_usd",
                         "provider_request_profiles_json",
                         "peer_sharing_json",
+                        "model_mappings_json",
                     ]
                     .into_iter()
                     .map(str::to_owned)
@@ -1128,6 +1137,7 @@ fn admin_client_key_cursor(cursor: ClientApiKeyCursor) -> AdminStoreResult<Admin
 
 fn admin_client_key_record(record: ClientApiKeyRecord) -> AdminStoreResult<AdminClientKeyRecord> {
     Ok(AdminClientKeyRecord {
+        model_mappings: record.model_mappings,
         peer_sharing: record.peer_sharing,
         request_profile_overrides: record.request_profile_overrides,
         id: ClientApiKeyId::new(record.id)
@@ -1182,8 +1192,8 @@ pub(crate) async fn insert_client_api_key_in_transaction(
     sqlx::query(
         "insert into client_api_keys (
            id, name, label, key, enabled, max_concurrency, requests_per_minute,
-           last_used_at, created_at, updated_at, daily_limit_usd, weekly_limit_usd, provider_request_profiles_json, peer_sharing_json
-         ) values ($1, $2, $3, $4, true, $5, $6, null, now(), now(), $7::text::numeric, $8::text::numeric, $9::jsonb, $10::jsonb)",
+           last_used_at, created_at, updated_at, daily_limit_usd, weekly_limit_usd, provider_request_profiles_json, peer_sharing_json, model_mappings_json
+         ) values ($1, $2, $3, $4, true, $5, $6, null, now(), now(), $7::text::numeric, $8::text::numeric, $9::jsonb, $10::jsonb, $11::jsonb)",
     )
     .bind(&key.id)
     .bind(key.name.trim())
@@ -1195,6 +1205,7 @@ pub(crate) async fn insert_client_api_key_in_transaction(
     .bind(key.budget.weekly_usd.canonical())
     .bind(sqlx::types::Json(request_profile_overrides))
     .bind(sqlx::types::Json(key.peer_sharing))
+    .bind(sqlx::types::Json(&key.model_mappings))
     .execute(&mut **transaction)
     .await
     .map_err(|error| {
@@ -1269,7 +1280,8 @@ pub(crate) async fn update_client_api_key_in_transaction(
              weekly_limit_usd = coalesce($7::text::numeric, weekly_limit_usd),
              provider_request_profiles_json = (provider_request_profiles_json - $8::text[])
                  || $9::jsonb,
-             peer_sharing_json = coalesce($10::jsonb, peer_sharing_json)
+             peer_sharing_json = coalesce($10::jsonb, peer_sharing_json),
+             model_mappings_json = coalesce($11::jsonb, model_mappings_json)
          where id = $1",
     )
     .bind(&key.id)
@@ -1282,6 +1294,7 @@ pub(crate) async fn update_client_api_key_in_transaction(
     .bind(removed_profiles)
     .bind(sqlx::types::Json(replacement_profiles))
     .bind(key.peer_sharing.map(sqlx::types::Json))
+    .bind(key.model_mappings.as_ref().map(sqlx::types::Json))
     .execute(&mut **transaction)
     .await
     .map_err(|source| postgres_unavailable("update client API key in transaction", source))?;
@@ -1479,6 +1492,10 @@ fn client_record_from_row(row: &sqlx::postgres::PgRow) -> StoreResult<ClientApiK
         .map_err(|source| invalid("invalid groups").with_source(source))?;
     Ok(
         ClientApiKeyRecord {
+            model_mappings: row
+                .try_get::<sqlx::types::Json<BTreeMap<String, String>>, _>("model_mappings_json")
+                .map_err(|source| invalid("invalid model mappings").with_source(source))?
+                .0,
             peer_sharing: row
                 .try_get::<sqlx::types::Json<ClientPeerSharing>, _>("peer_sharing_json")
                 .map_err(|source| invalid("invalid peer sharing").with_source(source))?

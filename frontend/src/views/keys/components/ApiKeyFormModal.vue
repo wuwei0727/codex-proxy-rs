@@ -11,6 +11,7 @@ import { isValidInstallationSeed } from '@/api/modules/settings/profiles'
 import AccountGroupCheckboxGrid from '@/components/AccountGroupCheckboxGrid.vue'
 import ProviderRequestProfilesEditor from '@/components/client-profile/ProviderRequestProfilesEditor.vue'
 import HelpPopover from '@/components/HelpPopover.vue'
+import ModelAliasesCard from '@/components/ModelAliasesCard.vue'
 import { generateRequestId as generateUuid } from '@/utils/operation'
 import { useApiKeyFormRules } from '../composables/useApiKeyFormRules'
 
@@ -118,6 +119,13 @@ function updatePeerSharing(key: keyof ApiKeyPeerSharing, value: boolean) {
           @update:model-value="updateForm('groupIds', $event)"
         />
       </ZFormItem>
+
+      <ModelAliasesCard
+        :mappings="form.modelMappings"
+        @add-mapping="updateForm('modelMappings', [...form.modelMappings, { requestedModel: '', upstreamModel: '' }])"
+        @update-mapping="(index, key, value) => updateForm('modelMappings', form.modelMappings.map((row, i) => i === index ? { ...row, [key]: value } : row))"
+        @remove-mapping="index => updateForm('modelMappings', form.modelMappings.filter((_, i) => i !== index))"
+      />
 
       <ZFormItem :label="t('keys.editor.peerSharing')">
         <template #label-extra>

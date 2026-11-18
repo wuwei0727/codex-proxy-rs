@@ -140,10 +140,12 @@ async fn peer_sharing_persists_across_reads_and_cannot_lose_its_group_scope() {
         share_quota: true,
         share_plans: false,
     };
+    let mappings = std::collections::BTreeMap::from([("group/claude".into(), "gpt-model".into())]);
     let id = ClientApiKeyId::new("key_peer_shared").unwrap();
     store
         .create_client_key(
             NewClientKey {
+                model_mappings: mappings.clone(),
                 peer_sharing: sharing,
                 request_profile_overrides: Default::default(),
                 id: id.clone(),
@@ -172,7 +174,9 @@ async fn peer_sharing_persists_across_reads_and_cannot_lose_its_group_scope() {
         .await
         .unwrap();
     assert_eq!(snapshot.client_api_keys[0].peer_sharing, sharing);
+    assert_eq!(snapshot.client_api_keys[0].model_mappings, mappings);
     let mut update = UpdateClientKey {
+        model_mappings: None,
         peer_sharing: None,
         request_profile_override_updates: Default::default(),
         id: id.clone(),
@@ -204,10 +208,13 @@ async fn peer_sharing_persists_across_reads_and_cannot_lose_its_group_scope() {
         .await
         .unwrap();
     assert_eq!(updated.peer_sharing, sharing);
+    assert_eq!(updated.model_mappings, mappings);
+    update.model_mappings = Some(Default::default());
     update.group_ids.clear();
     update.peer_sharing = Some(ClientPeerSharing::default());
     let (_, updated) = store.update_client_key(update, &context).await.unwrap();
     assert!(!updated.peer_sharing.enabled);
+    assert!(updated.model_mappings.is_empty());
     assert!(updated.groups.is_empty());
     database.close().await;
 }
@@ -240,6 +247,7 @@ async fn custom_keys_persist_exactly_and_keep_short_keys_masked() {
         let (_, record) = store
             .create_client_key(
                 NewClientKey {
+                    model_mappings: Default::default(),
                     peer_sharing: Default::default(),
                     request_profile_overrides: Default::default(),
                     id: id.clone(),
@@ -296,6 +304,7 @@ async fn duplicate_custom_keys_conflict_atomically_without_extra_audits() {
     };
     let key = "custom-key-case-sensitive!";
     let command = |id: &str| NewClientKey {
+        model_mappings: Default::default(),
         peer_sharing: Default::default(),
         request_profile_overrides: Default::default(),
         id: ClientApiKeyId::new(id).unwrap(),
@@ -333,6 +342,7 @@ async fn duplicate_custom_keys_conflict_atomically_without_extra_audits() {
 #[test]
 fn generated_client_key_format_remains_valid() {
     let key = NewClientApiKey {
+        model_mappings: Default::default(),
         peer_sharing: Default::default(),
         request_profile_overrides: Default::default(),
         budget: Default::default(),
@@ -367,6 +377,7 @@ async fn client_key_names_are_checked_atomically_on_create_and_rename() {
         request_id: "duplicate-name-test".to_owned(),
     };
     let create = |id: &str, name: &str| NewClientKey {
+        model_mappings: Default::default(),
         peer_sharing: Default::default(),
         request_profile_overrides: Default::default(),
         id: ClientApiKeyId::new(id).unwrap(),
@@ -378,6 +389,7 @@ async fn client_key_names_are_checked_atomically_on_create_and_rename() {
         plaintext: format!("synthetic-credential-{id}"),
     };
     let update = |id: ClientApiKeyId, name: &str| UpdateClientKey {
+        model_mappings: None,
         peer_sharing: None,
         request_profile_override_updates: Default::default(),
         id,
@@ -842,6 +854,7 @@ async fn dedicated_reveal_returns_plaintext_without_debug_exposure() {
 fn client_key_debug_redacts_plaintext() {
     let secret = format!("sk_{}", "s".repeat(43));
     let key = NewClientApiKey {
+        model_mappings: Default::default(),
         peer_sharing: Default::default(),
         request_profile_overrides: Default::default(),
         budget: Default::default(),
@@ -916,6 +929,7 @@ async fn key_profile_override_roundtrips_and_explicit_clear_restores_inheritance
     let (_, record) = store
         .create_client_key(
             NewClientKey {
+                model_mappings: Default::default(),
                 peer_sharing: Default::default(),
                 id: id.clone(),
                 name: "profile".to_owned(),
@@ -939,6 +953,7 @@ async fn key_profile_override_roundtrips_and_explicit_clear_restores_inheritance
     );
     assert_eq!(record.request_profile_overrides.get(&xai), Some(&profile));
     let update = |override_value: Option<Option<OpaqueProviderData>>| UpdateClientKey {
+        model_mappings: None,
         peer_sharing: None,
         id: id.clone(),
         name: "profile".to_owned(),

@@ -3635,6 +3635,101 @@ impl ExtensionSetLease for CatalogContributions {
 }
 
 #[test]
+fn client_model_mappings_isolate_generation_counting_and_catalogs() {
+    let provider = ProviderKind::new("openai").unwrap();
+    let primary = "gpt-key";
+    let global = "gpt-global";
+    let alias = "group/claude-opus";
+    let scope = account_scope(&provider, "acct_start");
+    let policy = |key, secret| {
+        ClientPolicy::new(
+            ClientApiKeyId::new(key).unwrap(),
+            PlaintextClientApiKey::new(secret).unwrap(),
+            scope.clone(),
+            true,
+            RateLimits::unlimited(),
+        )
+    };
+    let snapshot = RuntimeSnapshot::new(
+        ConfigRevision::new(1).unwrap(),
+        gateway_core::settings::SettingsValues::new(1, "smart", Default::default(), None, None)
+            .with_model_mappings([(alias.into(), global.into())].into()),
+        vec![provider.clone()],
+        [primary, global]
+            .into_iter()
+            .map(|id| {
+                ProviderModel::new(
+                    provider.clone(),
+                    UpstreamModelId::new(id).unwrap(),
+                    ModelCapabilities::new(
+                        [OperationKind::Generate, OperationKind::CountTokens].into(),
+                        None,
+                    ),
+                )
+            })
+            .collect(),
+        vec![
+            policy("key_coder", "sk_coder").with_model_mappings(
+                [
+                    (alias.into(), primary.into()),
+                    ("only-coder".into(), primary.into()),
+                ]
+                .into(),
+            ),
+            policy("key_normal", "sk_normal"),
+        ],
+    )
+    .unwrap();
+    let service = DefaultExecutionService::new(
+        RuntimeSnapshotHandle::new(snapshot),
+        Arc::new(TrackingExecutionStore::default()),
+        ProviderRegistry::new([Arc::new(CatalogProvider::Native) as Arc<dyn Provider>]).unwrap(),
+        Arc::new(UnusedAdmissions),
+        Arc::new(UnusedContinuation),
+        Arc::new(RecordingClientApiKeyUsage::default()),
+        Arc::new(crate::RecordingDiagnostics::default()),
+    );
+    for (key, expected) in [("sk_coder", primary), ("sk_normal", global)] {
+        let client = service.authenticate(key).unwrap();
+        assert_eq!(
+            service
+                .public_models(&client)
+                .iter()
+                .any(|model| model.as_str() == "only-coder"),
+            expected == primary
+        );
+        let prepared = block_on(service.prepare_execution(client)).unwrap();
+        for operation in [
+            Operation::Generate(GenerateRequest::from_protocol_payload(
+                ProtocolPayload::json_object(
+                    "anthropic",
+                    json!({"model": alias}).as_object().unwrap().clone(),
+                )
+                .unwrap(),
+            )),
+            Operation::CountTokens(TokenCountRequest::from_raw_json(
+                RawJsonPayload::new("anthropic", Bytes::from_static(b"{}")).unwrap(),
+            )),
+        ] {
+            let client = prepared.client();
+            let plan = client
+                .snapshot()
+                .plan(
+                    &PublicModelId::new(alias).unwrap(),
+                    &operation,
+                    client.policy().account_scope().clone(),
+                    &Default::default(),
+                )
+                .unwrap();
+            assert_eq!(
+                plan.candidates()[0].upstream_model().unwrap().as_str(),
+                expected
+            );
+        }
+    }
+}
+
+#[test]
 fn client_catalog_forwards_scope_maps_whole_objects_and_omits_unroutable_models() {
     for provider in [
         CatalogProvider::Native,
