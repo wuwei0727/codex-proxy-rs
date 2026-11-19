@@ -114,14 +114,19 @@ function handleCopyUserAgent(ua?: string | null) {
     </template>
 
     <template #accountPlanType="{ row }">
-      <AccountPlanBadge
+      <div
         v-if="row.accountUpstreamPeer || row.authenticationKind === 'api_key' || row.accountPlanType"
-        :authentication-kind="row.authenticationKind ?? undefined"
-        :upstream-peer="row.accountUpstreamPeer"
-        :plan-type="row.accountPlanType"
-        :plan-type-display="row.accountPlanTypeDisplay || row.accountPlanType || ''"
-        size="sm"
-      />
+        class="-mx-2.5 flex min-w-0 justify-center"
+      >
+        <AccountPlanBadge
+          wrap
+          :authentication-kind="row.authenticationKind ?? undefined"
+          :upstream-peer="row.accountUpstreamPeer"
+          :plan-type="row.accountPlanType"
+          :plan-type-display="row.accountPlanTypeDisplay || row.accountPlanType || ''"
+          size="sm"
+        />
+      </div>
       <span v-else class="text-z-text-quaternary">—</span>
     </template>
 
