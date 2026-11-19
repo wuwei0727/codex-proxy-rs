@@ -34,11 +34,13 @@ const props = withDefaults(
   defineProps<{
     columns: TableColumn<UsageListRecord>[]
     rows: UsageListRecord[]
+    tableId?: string
     loading?: boolean
     emptyText?: string
   }>(),
   {
     loading: false,
+    tableId: 'usage-records',
   },
 )
 
@@ -62,7 +64,7 @@ function handleCopyUserAgent(ua?: string | null) {
 
 <template>
   <ZTable
-    table-id="usage-records"
+    :table-id="tableId"
     resizable
     :columns="columns"
     :data="rows"

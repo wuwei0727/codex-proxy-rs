@@ -119,8 +119,8 @@ const providerOptions = computed<SelectOption[]>(() =>
       </ZButton>
     </div>
 
-    <!-- 右侧操作区：插槽（脱敏、失败切换、列设置）与刷新按钮 -->
-    <div class="ml-auto flex shrink-0 items-center justify-end gap-2">
+    <!-- 右侧操作区：脱敏、失败切换、来源筛选、列设置与刷新 -->
+    <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
       <slot name="actions" />
       <ZIconButton
         size="default"
