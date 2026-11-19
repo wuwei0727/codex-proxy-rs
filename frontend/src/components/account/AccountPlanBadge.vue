@@ -38,20 +38,31 @@ const planPalettes: Record<string, string> = {
 }
 
 const PLAN_DISPLAY_ALIASES: Record<string, string> = {
-  'pro': 'Pro 20x',
-  'pro_20x': 'Pro 20x',
-  'pro-20x': 'Pro 20x',
-  'pro20x': 'Pro 20x',
-  '20x': 'Pro 20x',
-  'prolite': 'Pro 5x',
-  'pro_lite': 'Pro 5x',
-  'pro-lite': 'Pro 5x',
-  'pro_5x': 'Pro 5x',
-  'promax': 'Pro 10x',
-  'pro_max': 'Pro 10x',
-  'pro-max': 'Pro 10x',
+  'pro': 'Pro 200',
+  'pro_20x': 'Pro 200',
+  'pro-20x': 'Pro 200',
+  'pro20x': 'Pro 200',
+  '20x': 'Pro 200',
+  'prolite': 'Pro 100',
+  'pro_lite': 'Pro 100',
+  'pro-lite': 'Pro 100',
+  'pro_5x': 'Pro 100',
+  'promax': 'Pro 500',
+  'pro_max': 'Pro 500',
+  'pro-max': 'Pro 500',
   'pro_10x': 'Pro 10x',
   'self_serve_business_prolite': 'Business 5x',
+  'business': '企业',
+  'ent26': '企业',
+  'enterprise': '企业',
+  'hc': '企业',
+  'enterprise_cbp_usage_based': '企业',
+  'enterprise_cbp_automation': '自动化',
+  'enterprise_(automation)': '自动化',
+  'sci': '科研',
+  'academic_researchers': '科研',
+  'sci_plus': '科研 Plus',
+  'academic_researchers_plus': '科研 Plus',
 }
 
 const fallbackPalettes = [
@@ -83,6 +94,13 @@ const displayText = computed(() => {
 const tooltipText = computed(() => {
   if (!displayText.value)
     return undefined
+  const proPrice = /^Pro (100|200|500)$/.exec(displayText.value)?.[1]
+  if (proPrice) {
+    const rawPlan = props.planType
+      ? ` (${props.planType})`
+      : ''
+    return `${displayText.value} · 官方月费档位：${proPrice} 美元/月${rawPlan}`
+  }
   if (props.planType && props.planType.toLowerCase() !== displayText.value.toLowerCase())
     return `${displayText.value} (${props.planType})`
   return displayText.value
