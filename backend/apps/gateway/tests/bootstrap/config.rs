@@ -28,11 +28,16 @@ fn config_loader_should_resolve_paths_relative_to_config_file() {
 #[test]
 fn config_loader_should_share_resolved_assets_with_system_update() {
     const CHILD_ENV: &str = "CPR_TEST_UPDATE_ASSETS_CHILD";
+    let docker_assets = if cfg!(windows) {
+        "C:/app/web/dist"
+    } else {
+        "/app/web/dist"
+    };
     let Ok(case) = std::env::var(CHILD_ENV) else {
         // 使用子进程覆盖无环境变量、Docker 路径和相对路径，避免污染并行测试
         for (case, web_dist) in [
             ("binary", None),
-            ("docker", Some("/app/web/dist")),
+            ("docker", Some(docker_assets)),
             ("relative", Some("../custom/dist")),
         ] {
             let mut child = Command::new(std::env::current_exe().expect("test executable"));
@@ -60,9 +65,9 @@ fn config_loader_should_share_resolved_assets_with_system_update() {
     document["api"]["asset_directory"] = serde_json::json!("../web/dist");
     let (config, directory) = parse_config(&document.to_string()).expect("binary configuration");
     let assets = match case.as_str() {
-        "docker" => std::path::PathBuf::from("/app/web/dist"),
-        "relative" => directory.path().join("deploy/../custom/dist"),
-        _ => directory.path().join("deploy/../web/dist"),
+        "docker" => std::path::PathBuf::from(docker_assets),
+        "relative" => directory.path().join("deploy").join("../custom/dist"),
+        _ => directory.path().join("deploy").join("../web/dist"),
     };
     let debug = format!("{config:?}");
     assert!(debug.contains(&format!("asset_directory: {assets:?}")));
@@ -71,9 +76,12 @@ fn config_loader_should_share_resolved_assets_with_system_update() {
 
 #[test]
 fn config_loader_should_reject_missing_runtime_data_dir() {
-    let config = valid_config().replace("  runtime_data_dir: '../.runtime/data'\n", "");
-
-    assert!(parse_config(&config).is_err());
+    let mut document = valid_config_document();
+    document["host"]
+        .as_object_mut()
+        .unwrap()
+        .remove("runtime_data_dir");
+    assert!(parse_config(&document.to_string()).is_err());
 }
 
 #[test]
@@ -240,7 +248,12 @@ fn config_loader_should_report_startup_configuration_diagnostics() {
 
 #[test]
 fn config_loader_should_reject_missing_explicit_fields() {
-    assert_rejected(valid_config().replace("  request_id_header: 'x-request-id'\n", ""));
+    let mut document = valid_config_document();
+    document["api"]
+        .as_object_mut()
+        .unwrap()
+        .remove("request_id_header");
+    assert_rejected(document.to_string());
 }
 
 #[test]
