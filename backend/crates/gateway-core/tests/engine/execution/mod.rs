@@ -3640,12 +3640,20 @@ impl ExtensionSetLease for CatalogContributions {
 }
 
 #[test]
-fn client_model_mappings_isolate_generation_counting_and_catalogs() {
+fn client_model_mappings_isolate_generation_counting_catalogs_and_reviewer_routing() {
     let provider = ProviderKind::new("openai").unwrap();
     let primary = "gpt-key";
     let global = "gpt-global";
     let alias = "group/claude-opus";
-    let scope = account_scope(&provider, "acct_start");
+    let reviewer = "codex-auto-review";
+    let scope = Arc::new(FrozenAccountScope::new(
+        Arc::new(RuntimeAccountDirectory::new(BTreeMap::from([(
+            ProviderAccountId::new("acct_start").unwrap(),
+            RuntimeAccount::new(provider.clone(), BTreeSet::new())
+                .with_direct_authentication_kind(Some("oauth".into())),
+        )]))),
+        ClientRoutingScope::all_accounts(),
+    ));
     let policy = |key, secret| {
         ClientPolicy::new(
             ClientApiKeyId::new(key).unwrap(),
@@ -3660,7 +3668,7 @@ fn client_model_mappings_isolate_generation_counting_and_catalogs() {
         gateway_core::settings::SettingsValues::new(1, "smart", Default::default(), None, None)
             .with_model_mappings([(alias.into(), global.into())].into()),
         vec![provider.clone()],
-        [primary, global]
+        [primary, global, reviewer]
             .into_iter()
             .map(|id| {
                 ProviderModel::new(
@@ -3729,6 +3737,41 @@ fn client_model_mappings_isolate_generation_counting_and_catalogs() {
             assert_eq!(
                 plan.candidates()[0].upstream_model().unwrap().as_str(),
                 expected
+            );
+        }
+        for requested in [alias, "only-coder"] {
+            let client = prepared.client();
+            let plan = client
+                .snapshot()
+                .plan_with_direct_account_model(
+                    &PublicModelId::new(requested).unwrap(),
+                    &Operation::Generate(GenerateRequest::from_protocol_payload(
+                        ProtocolPayload::json_object(
+                            "openai",
+                            json!({"model": requested}).as_object().unwrap().clone(),
+                        )
+                        .unwrap(),
+                    )),
+                    client.policy().account_scope().clone(),
+                    &Default::default(),
+                    gateway_core::routing::DirectAccountModel {
+                        provider: &provider,
+                        model: &UpstreamModelId::new(reviewer).unwrap(),
+                        continuation_owner: None,
+                    },
+                    |_| true,
+                )
+                .unwrap();
+            let expected_model = if key == "sk_normal" && requested == "only-coder" {
+                reviewer
+            } else {
+                expected
+            };
+            let candidate = &plan.candidates()[0];
+            assert_eq!(candidate.upstream_model().unwrap().as_str(), expected_model);
+            assert_eq!(
+                candidate.requires_direct_authentication(),
+                expected_model == reviewer
             );
         }
     }
@@ -5176,10 +5219,20 @@ fn request_settings_recompute_routing_and_admission_without_changing_sibling_or_
 
 #[test]
 fn invalid_request_settings_leave_the_prepared_execution_unchanged() {
+    use gateway_core::routing::request_settings::ExecutionSettings;
+
     let service = service(Arc::new(Admissions::default()), Arc::new(Budget::default()));
     let client = service.authenticate("sk_start_test").unwrap();
     let prepared = service.prepare_verified_execution(client).unwrap();
     let baseline = prepared.request_settings().execution_values().unwrap();
+    for field in [
+        "openai_oauth_guardian_review_model",
+        "openai_request_country",
+    ] {
+        let mut incomplete = serde_json::to_value(&baseline).unwrap();
+        incomplete["runtime"].as_object_mut().unwrap().remove(field);
+        assert!(serde_json::from_value::<ExecutionSettings>(incomplete).is_err());
+    }
     let mut invalid = serde_json::to_value(&baseline).unwrap();
     invalid["runtime"]["responses_max_decompressed_body_bytes"] = json!(0);
     invalid["fast_mode"] = json!("disabled");

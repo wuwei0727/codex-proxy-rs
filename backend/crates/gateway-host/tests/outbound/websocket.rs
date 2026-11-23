@@ -226,12 +226,13 @@ async fn websocket_rejections_return_http_body_and_never_fall_back_from_proxy() 
     let proxy =
         OutboundProxy::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
     drop(listener);
+    // Windows 拒绝已关闭端口的连接可能超过两秒，保留传输错误与截止超时的区别。
     let error = client
         .open_websocket(
             request(server.uri()),
             Some(&proxy),
             &network(),
-            Duration::from_secs(2),
+            Duration::from_secs(5),
         )
         .await
         .err()

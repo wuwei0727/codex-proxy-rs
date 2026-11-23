@@ -99,6 +99,8 @@ async fn shutdown_with_pending_request(trigger: ShutdownTrigger) {
     let address = reservation.local_addr().unwrap();
     let mut config = configuration(directory.path());
     config.listen.port = address.port();
+    // 为 Windows 的已关闭端口探测留出时间；下方仍须验证清理在显式放行前不会完成。
+    config.worker_shutdown_timeout_seconds = 5;
     config.system_update.deployment_mode = "docker".to_owned();
     config.system_update.build_type = "source".to_owned();
     config.system_update.self_restart_enabled = true;
