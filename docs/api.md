@@ -432,6 +432,9 @@ Messages 费用按管理员显式配置的模型价格计算，未配置时保�
 Images 使用原生非流式 JSON 端点，JSON 请求与响应正文原样转发。
 `/v1/images/edits` 还接受 `multipart/form-data`，将上传转换为原生 Images JSON 请求
 
+Key 允许生图时，已绑定分组的 Key 只使用允许该图片模型的启用分组成员。账号自身的模型黑白名单进一步收窄可选范围。
+采用严格或优先亲和时优先使用会话主账号。主账号在授权池内但模型权限、套餐或上游协议不支持本次生图时，可以临时借用合格账号，后续聊天仍沿用原绑定
+
 multipart 的 `image` 和 `image[]` 上传按出现顺序组成 `images` 数组，每项为
 `{"image_url":"data:image/...;base64,..."}`；`mask` 上传转换为同结构的单个对象。
 图片支持 PNG、JPEG、WebP，根据内容识别格式，原始文件字节直接编码，不缩放或重新编码
@@ -518,6 +521,9 @@ Responses 的安装身份通过正文 `client_metadata` 及 turn metadata 发送
 同账号轮换令牌导致该声明变化时，新请求使用新的上游 WS 连接，旧连接上的精确续接需要客户端重放。
 上述过滤描述原生转发；已信任插件的显式 header 改写可以覆盖账号与画像生成的默认头，
 不按认证或会话字段名称拦截，边界见 [SDK 请求中间件](../backend/crates/gateway-plugin/sdk/docs/capabilities.md#模型请求与-attempt)
+
+Responses 透传客户端的 `x-codex-exclude`，由上游按请求省略响应字段。上游 WebSocket 只在握手时读取该头，
+因此连接池按最终握手中的全部同名头值复用连接。头值变化时，依赖原连接的精确续接需要客户端重放完整历史
 
 Responses 也不透传 `x-stainless-*`、`Origin`、`Referer`、`sec-ch-ua*` 和 `sec-fetch-*`
 携带的下游 SDK/浏览器环境或页面来源。过滤规则适用于所有下游客户端，与 User-Agent 无关；
@@ -681,7 +687,11 @@ OpenAI Responses 上游 WS 按握手响应头 `x-codex-websocket-max-message-byt
 该上限只属于当前上游连接；响应头缺失或无效时不预判超限。显式 warmup 保持 WS 合同，超限时
 返回 `websocket_message_too_large`，不重复发送或改用 HTTP
 
-超过当前连接上限的 connection-local WS 续接会在发送前返回 `400 previous_response_not_found`。
+上传期间网关持续读取上游帧并回复 Ping。上游在本次请求开始发送后、首条响应文本前返回关闭码
+1009 时，采用与握手超限相同的传输选择。显式 warmup 保留上游关闭错误。收到响应文本（含元数据）后
+再收到 1009，网关保留原错误，避免重复执行。单独的断管或 TCP 重置按传输失败处理
+
+超过当前连接上限的 connection-local WS 续接会返回 `400 previous_response_not_found`。
 上游 HTTP/SSE 在 `store=false` 下成功后，若网关已记录该响应需要完整重放，HTTP 和 WS 客户端携带其
 `previous_response_id` 继续生成时也会收到同一错误。客户端应清除旧 ID，
 携带完整历史及工具调用／输出重试。官方 Codex 支持重连 WS 后完整重发，也可能按自身重试预算
@@ -1389,7 +1399,7 @@ Key 消费窗口的 `localUsage` 按各自 `[resetAt - windowSeconds, resetAt)` 
 
 - 收到有效快照时显示 CPR 互联。明确返回不支持协议（HTTP 404、405、501），或返回 `403 peer_sharing_disabled` 时，清除互联身份和共享数据，显示普通 API Key
 - 普通 401/403 保留原识别结果并清除已撤销的共享内容。超时、限流、服务异常或无效响应保留原识别结果和已有观测。无观测时 `observedAt` 与 `pool` 为 `null`，额度窗口为空
-- 展开可探测的 API Key 后，点击「刷新额度」可重新识别互联。卡片显示已有更新时间，手动刷新结果通过通知反馈。明确不支持协议的连接停止周期探测，共享关闭的连接按授权退避周期复查
+- 可探测但尚未识别为互联的 API Key 支持手动检测。明确不支持协议的连接停止周期探测，共享关闭的连接按授权退避周期复查
 
 账号地址、密钥或出口变更使旧观测与识别身份失效，重新识别当前连接。
 账号停用后停止同步，重新启用后按当前连接的识别结果恢复后台任务
@@ -1702,7 +1712,8 @@ RT-only 使用同一形状，只提交 `refreshToken`。不得把真实 token �
 管理端新建表单留空时省略 `notes`。重新授权不接受 `settings`，凭据刷新保留账号设置
 
 可选 `name` 与编辑名称使用相同的长度和控制字符约束，仅在单份导入数据解析出一个账号时覆盖名称。
-省略、`null`、留空或多账号导入均保留导入数据或服务商提供的名称；管理端批量导入不提交 `name`
+省略、`null`、留空或多账号导入均保留导入数据或服务商提供的名称；管理端批量导入不提交 `name`。
+API Key 账号未指定名称时默认使用「密钥账号」
 
 账号列表的每个 item 返回轻量 `groups: [{ id, name, enabled }]`
 
@@ -1859,7 +1870,7 @@ OpenAI 授权码交换与令牌刷新请求的连接超时为 30 秒，单次上
 
 样本仅使用当前额度窗口内、账号加入后开始且截至观测时间已完整交付的请求，缓存命中不重复计入输入
 
-重置或套餐变化后重新积累有效进度，中途加入的账号可在新基线后采样，无需等待下一次重置，职责与断点处理见[额度预测架构](architecture.md#额度预测)
+重置或套餐变化后重新积累有效进度，中途加入的账号可在新基线后采样。单条历史读数的重置时间偏移不会截断已记录用量。疑似跨周期且仍待确认时，接口保留来源用量并暂停估算，详见[额度预测架构](architecture.md#额度预测)
 
 预测不参与调度或账单结算，站外消耗、日志清理、异步延迟、未成功交付的上游消耗和模型组合变化均可能造成误差
 
@@ -2168,7 +2179,7 @@ OpenAI Key 的 `installationSeed` 接受带连字符的 UUID，保存时规范�
 
 严格亲和下的后代线程始终启用账号排队，沿用 `accountQueueTimeoutSeconds` 和请求截止时间；
 `maxWaitingPerAccount` 为 0 时使用每队列 1,000 人上限，否则沿用配置的上限。
-可识别来源的 Search、Images、Live 创建请求采用同样规则，身份与轮次关联见[会话绑定](architecture.md#6-路由账号范围与-continuation)。
+可识别来源的 Search、Images、Live 创建请求共用会话绑定。主账号缺少本次生图资格时，后代可按 [Images 请求](#images-请求)规则借号。身份与轮次关联见[会话绑定](architecture.md#6-路由账号范围与-continuation)。
 插件显式选号须通过账号资格与租约检查，见[调度合同](../backend/crates/gateway-plugin/sdk/docs/capabilities.md#路由调度与观察)。普通请求关闭账号排队且没有可用容量时返回 `503` / `account_capacity_unavailable`，
 与无候选账号的 `no_available_provider` 区分；排队不绕过账号范围、模型权限、RPM 或金额限额
 
@@ -2317,7 +2328,7 @@ JSON 路径支持 `$`、`.成员`、`["带特殊字符的键"]`、`[索引]`、`
 
 WebSocket 请求头在握手时发送。隐私规则改变握手头时，普通请求按对应连接身份选择连接，
 处理结果稳定时可继续复用，不因每次执行删除动作而重连。
-依赖原连接的精确续接保留原连接，规则变更不能撤回已有握手发送的值
+依赖原连接的精确续接在响应排除项等连接归属条件仍匹配时保留原连接，规则变更不能撤回已有握手发送的值
 
 例如，`turn_metadata` 范围的 `$.workspaces` 配合 `remove_field` 删除整个工作区映射；
 `$.workspaces.*.associated_remote_urls.*` 配合 `remove_field` 和 `pattern: "private-org"` 只删除命中的远端；
@@ -2391,7 +2402,7 @@ Guardian 以 `subagent_kind` 或 `client_metadata.x-openai-subagent` 值 `guardi
   主账号被删除、停用或凭据过期、失效、封禁时，在后备账号成功准入时原子迁移绑定
   额度耗尽且重置时间未知或距离当前时刻超过账号排队时限时迁移，接近重置时保留主绑定，并给刚过重置时间的额度复核同长度宽限
   原生续接仍固定其状态归属账号
-- `strict`（严格）：同一会话共用账号，后代请求等待当前账号并跟随根请求换号
+- `strict`（严格）：同一会话共用账号，后代请求等待当前账号并跟随根请求换号；[原生 Images](#images-请求) 可按生图资格临时借号
 
 插件显式选号及原生续写的状态归属约束在三种模式下仍然生效
 
