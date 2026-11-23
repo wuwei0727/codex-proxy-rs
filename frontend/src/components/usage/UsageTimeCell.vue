@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   value?: string | null
+  datetime?: string
 }>()
 
 const currentYear = new Date().getFullYear().toString()
@@ -40,7 +41,7 @@ const parsedTime = computed(() => {
 </script>
 
 <template>
-  <div v-if="parsedTime.time" class="min-w-0 text-center" :title="parsedTime.full">
+  <time v-if="parsedTime.time" :datetime="datetime" class="block min-w-0 text-center" :title="parsedTime.full">
     <!-- 主显：秒级时分秒（高亮突出，清晰易读） -->
     <span class="block truncate font-mono text-z-sm leading-none font-bold text-z-text tabular-nums tracking-tight">
       {{ parsedTime.time }}
@@ -52,6 +53,6 @@ const parsedTime = computed(() => {
     >
       {{ parsedTime.date }}
     </span>
-  </div>
+  </time>
   <span v-else class="text-z-text-quaternary">—</span>
 </template>

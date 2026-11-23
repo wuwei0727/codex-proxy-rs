@@ -316,7 +316,9 @@
     "location": {
       "requestCountry": "Request country",
       "requestCountryScope": "Applies only to Codex OAuth accounts",
+      "requestCountryDescription": "Choose how Codex requests send the country code",
       "countryHelp": "Request country mode help",
+      "countryMode": "Policy",
       "countryModes": {
         "default": "Null",
         "passthrough": "Pass through",
