@@ -74,6 +74,8 @@ pub enum CodexAccountFailure {
     Banned,
     /// 账号信用额度已耗尽
     QuotaExhausted,
+    /// 当前凭据被上游支出上限拒绝，其他凭据的归属未知
+    SpendLimitExceeded,
     /// 当前用量窗口已耗尽；到重置时间后可自动恢复
     UsageLimitExhausted {
         /// 上游返回的窗口绝对重置时刻
@@ -594,7 +596,7 @@ impl CodexCredentialSelector {
                 .collect());
         }
         if diagnostic {
-            return Ok(self.repository.list_for_provider().await?);
+            return Ok(self.repository.list_for_provider(false).await?);
         }
         let account_ids: Vec<_> = attempt
             .account_scope()
@@ -1701,7 +1703,7 @@ impl CodexCredentialSelector {
         .map(|alias| alias.map(|alias| CodexSessionAffinity::from_turn_alias(turn.clone(), alias)))
     }
 
-    async fn lookup_session_affinity(
+    pub(crate) async fn lookup_session_affinity(
         &self,
         key: &ProviderSessionAffinityKey,
     ) -> Result<Option<ProviderSessionBinding>, CredentialSelectionError> {
@@ -1986,6 +1988,11 @@ impl CodexCredentialSelector {
             CodexAccountFailure::QuotaExhausted => self
                 .quota
                 .record_confirmed_exhaustion(account, QuotaEvidence::PaymentRequired, None, now)
+                .await
+                .map_err(|source| CredentialSelectionError::Store(ErrorSource::new(source))),
+            CodexAccountFailure::SpendLimitExceeded => self
+                .quota
+                .record_confirmed_exhaustion(account, QuotaEvidence::ProviderDenied, None, now)
                 .await
                 .map_err(|source| CredentialSelectionError::Store(ErrorSource::new(source))),
             CodexAccountFailure::UsageLimitExhausted { reset_at } => self
