@@ -3,7 +3,7 @@ import type { Ref } from 'vue'
 import type { UsageListRecord, UsageRecordStatus } from '@/api'
 import { useTableColumns } from '@codex-proxy/ui'
 import { computed } from 'vue'
-import { usageRecordColumns } from '@/components/usage/shared/columns'
+import { usageRecordColumns } from '@/components/usage-records-table/columns'
 import { t } from '@/i18n'
 
 export function useUsageRecordColumns(status: Ref<UsageRecordStatus>, tableWidth: Readonly<Ref<number>>) {

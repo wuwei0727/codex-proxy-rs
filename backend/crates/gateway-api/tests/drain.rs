@@ -30,8 +30,9 @@ async fn drain_control(app: axum::Router, method: &str) -> serde_json::Value {
 
 #[tokio::test]
 async fn request_drain_tracks_body_lifetime_and_restores_admission() {
-    let app =
-        crate::openai::api_router_with_admin(crate::admin::AdminTestFixture::new().await.services);
+    let app = crate::data_plane::api_router_with_admin(
+        crate::admin::AdminTestFixture::new().await.services,
+    );
     assert_eq!(drain_control(app.clone(), "GET").await["activeRequests"], 0);
     // 无认证响应也必须在 body 交付或取消后释放，不能只等 handler 返回
     let response = app
@@ -81,8 +82,9 @@ async fn request_drain_tracks_body_lifetime_and_restores_admission() {
 
 #[tokio::test]
 async fn request_drain_rejects_external_and_forwarded_control() {
-    let app =
-        crate::openai::api_router_with_admin(crate::admin::AdminTestFixture::new().await.services);
+    let app = crate::data_plane::api_router_with_admin(
+        crate::admin::AdminTestFixture::new().await.services,
+    );
     for (peer, forwarded) in [
         (None, false),
         (Some("192.0.2.10:1234"), false),

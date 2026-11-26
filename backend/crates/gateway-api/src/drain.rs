@@ -68,7 +68,7 @@ pub(crate) async fn control(
     {
         return StatusCode::FORBIDDEN.into_response();
     }
-    let activity = state.openai().activity();
+    let activity = state.data_plane().activity();
     let mut current = activity
         .0
         .lock()
@@ -87,8 +87,14 @@ pub(crate) async fn track_http(
     request: Request,
     next: Next,
 ) -> Response {
-    let Some(guard) = state.openai().activity().enter() else {
-        return crate::openai::error::runtime_unavailable_response().into_response();
+    let Some(guard) = state.data_plane().activity().enter() else {
+        return crate::client_error::openai_error_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Gateway configuration is temporarily unavailable.",
+            "server_error",
+            "runtime_configuration_unavailable",
+        )
+        .into_response();
     };
     let response = next.run(request).await;
     // Responses 在每个 response.create 内计数；live adapter 自己持有会话 guard

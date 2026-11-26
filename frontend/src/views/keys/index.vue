@@ -5,7 +5,7 @@ import { ZCard, ZCheckbox, ZConfirmDialog, ZPagination, ZTable } from '@codex-pr
 import { ref, shallowRef, watch } from 'vue'
 
 import { useI18n } from 'vue-i18n'
-import ApiKeyConfigModal from '@/components/ApiKeyConfigModal.vue'
+import ApiKeyConfigModal from '@/components/api-key-config-modal/index.vue'
 import ClientImportModal from '@/components/ClientImportModal.vue'
 import LastUsedAtCell from '@/components/LastUsedAtCell.vue'
 import { useAccountGroupCatalog } from '@/composables/useAccountGroupCatalog'

@@ -4,7 +4,7 @@ import { ZButton, ZDatePicker, ZIconButton, ZSelect } from '@codex-proxy/ui'
 import { RefreshCw, RotateCcw } from '@lucide/vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatProviderLabel, PROVIDER_IDS } from '@/utils/providers'
+import { formatProviderLabel, PROVIDER_IDS } from '@/providers/catalog'
 
 defineProps<{
   accountOptions: SelectOption[]

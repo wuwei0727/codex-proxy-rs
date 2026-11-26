@@ -505,7 +505,7 @@ impl DefaultExecutionService {
                 if !authorization.account_scope.provider_kinds().contains(&provider) {
                     return Err(GatewayError::new(
                         GatewayErrorKind::PolicyDenied,
-                        "Nested provider is outside the frozen account scope.",
+                        "Model provider is outside the frozen account scope.",
                     ));
                 }
                 routing_context.required_provider = Some(provider);
