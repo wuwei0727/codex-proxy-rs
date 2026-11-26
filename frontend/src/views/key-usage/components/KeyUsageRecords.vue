@@ -16,6 +16,7 @@ import UsageReasoningEffortCell from '@/components/usage-records-table/UsageReas
 import UsageRouteCell from '@/components/usage-records-table/UsageRouteCell.vue'
 import UsageTimeCell from '@/components/usage-records-table/UsageTimeCell.vue'
 import UsageTokenCell from '@/components/usage-records-table/UsageTokenCell.vue'
+import UsageTransportBadge from '@/components/usage-records-table/UsageTransportBadge.vue'
 import UsageRecordStatusFilter from '@/components/UsageRecordStatusFilter.vue'
 
 defineProps<{ rows: KeyUsageRecord[], pagination: Pagination, loading: boolean }>()

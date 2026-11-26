@@ -10,6 +10,7 @@ import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AccountGroupCheckboxGrid from '@/components/AccountGroupCheckboxGrid.vue'
 import ModelAliasesCard from '@/components/ModelAliasesCard.vue'
+import ProviderSelect from '@/components/ProviderSelect.vue'
 import ProviderSettingsSection from '@/components/ProviderSettingsSection.vue'
 import ProviderRequestProfilesEditor from '@/components/request-profile/index.vue'
 import { isValidInstallationSeed } from '@/providers/openai/request-profile/installationSeed'
@@ -138,31 +139,29 @@ function updatePeerSharing(key: keyof ApiKeyPeerSharing, value: boolean) {
         />
       </ZFormItem>
 
-      <ModelAliasesCard
-        :mappings="form.modelMappings"
-        @add-mapping="updateForm('modelMappings', [...form.modelMappings, { requestedModel: '', upstreamModel: '' }])"
-        @update-mapping="(index, key, value) => updateForm('modelMappings', form.modelMappings.map((row, i) => i === index ? { ...row, [key]: value } : row))"
-        @remove-mapping="index => updateForm('modelMappings', form.modelMappings.filter((_, i) => i !== index))"
-      />
-
-      <ApiKeyPeerSharingField :sharing="form.peerSharing" :disabled="saving" @change="updatePeerSharing" />
-
       <ApiKeyLimitFields
         v-model:daily-limit-usd="form.dailyLimitUsd" v-model:weekly-limit-usd="form.weeklyLimitUsd"
         v-model:max-concurrency="form.maxConcurrency" v-model:requests-per-minute="form.requestsPerMinute"
         :disabled="saving"
       />
 
-      <ProviderSettingsSection v-model="provider" :disabled="saving">
-        <ZFormItem :label="t('keys.editor.upstreamIdentity')">
-          <ProviderRequestProfilesEditor
-            :model-value="form.providerRequestProfileOverrides" allow-inherit
-            :active="open"
-            :provider="provider"
-            :disabled="saving"
-            @update:model-value="updateForm('providerRequestProfileOverrides', $event)"
-          />
-        </ZFormItem>
+      <ProviderSettingsSection v-model="provider" :disabled="saving" hide-header>
+        <ProviderRequestProfilesEditor
+          :model-value="form.providerRequestProfileOverrides" allow-inherit
+          :active="open"
+          :provider="provider"
+          :source-label="t('keys.editor.upstreamIdentity')"
+          :disabled="saving"
+          @update:model-value="updateForm('providerRequestProfileOverrides', $event)"
+        >
+          <template #source-extra>
+            <ProviderSelect
+              v-model="provider"
+              :disabled="saving"
+              class="shrink-0"
+            />
+          </template>
+        </ProviderRequestProfilesEditor>
 
         <InstallationSeedField
           v-if="provider === 'openai'"
@@ -170,7 +169,17 @@ function updatePeerSharing(key: keyof ApiKeyPeerSharing, value: boolean) {
           v-model="form.installationSeed" :error="installationSeedError" :disabled="saving"
           :placeholder="t('settings.clientProfile.installationSeedPlaceholder')"
         />
+
+        <ApiKeyPeerSharingField inline :sharing="form.peerSharing" :disabled="saving" @change="updatePeerSharing" />
       </ProviderSettingsSection>
+
+      <ModelAliasesCard
+        compact
+        :mappings="form.modelMappings"
+        @add-mapping="updateForm('modelMappings', [...form.modelMappings, { requestedModel: '', upstreamModel: '' }])"
+        @update-mapping="(index, key, value) => updateForm('modelMappings', form.modelMappings.map((row, i) => i === index ? { ...row, [key]: value } : row))"
+        @remove-mapping="index => updateForm('modelMappings', form.modelMappings.filter((_, i) => i !== index))"
+      />
     </ZForm>
 
     <template #footer>

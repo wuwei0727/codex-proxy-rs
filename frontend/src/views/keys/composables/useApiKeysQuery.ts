@@ -133,10 +133,22 @@ export function useApiKeysQuery() {
     void execute()
   })
 
+  function setKeysEnabled(ids: Iterable<string>, enabled: boolean) {
+    const idSet = ids instanceof Set
+      ? ids
+      : new Set(ids)
+    apiKeys.value = apiKeys.value.map(item =>
+      idSet.has(item.id)
+        ? { ...item, enabled }
+        : item,
+    )
+  }
+
   return {
     loading,
     apiKeys,
     loadApiKeys: reloadFromStart,
+    setKeysEnabled,
     searchQuery,
     sort,
     apiKeyPagination,

@@ -28,6 +28,7 @@ import UsageReasoningEffortCell from './UsageReasoningEffortCell.vue'
 import UsageRouteCell from './UsageRouteCell.vue'
 import UsageTimeCell from './UsageTimeCell.vue'
 import UsageTokenCell from './UsageTokenCell.vue'
+import UsageTransportBadge from './UsageTransportBadge.vue'
 
 // 使用记录表只负责该领域的单元格呈现；筛选与分页由页面组合。
 const props = withDefaults(

@@ -213,7 +213,18 @@
       "consumeTokens": "Tokens used",
       "totalRequests": "Requests",
       "totalCost": "Cost",
-      "usageDetails": "Usage details"
+      "usageDetails": "Usage details",
+      "failed": "Failed",
+      "cost": "Cost",
+      "input": "Input",
+      "output": "Output",
+      "cache": "Cache",
+      "estimatedCost": "Estimated cost",
+      "reasoningTokens": "Reasoning {count}",
+      "shareRate": "Share {rate}",
+      "hitRate": "Hit rate {rate}",
+      "successRate": "Success {rate}",
+      "failureRate": "Failure {rate}"
     },
     "trends": {
       "cost": "Cost",
@@ -376,8 +387,6 @@
     "failedRequests": "Failed Requests",
     "withinFilterRange": "Within filter range",
     "inputOutput": "Input: {inputTokens} / Output: {outputTokens}",
-    "cachedTokens": "Cached tokens",
-    "cacheReadHit": "Cache read hit",
     "averageTimeTaken": "Average latency",
     "successfulRequestAverage": "Successful requests only",
     "usageOverview": "Usage overview",

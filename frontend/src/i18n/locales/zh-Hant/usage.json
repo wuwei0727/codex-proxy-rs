@@ -213,7 +213,18 @@
       "consumeTokens": "消耗 Tokens",
       "totalRequests": "總請求",
       "totalCost": "總成本",
-      "usageDetails": "用量明細"
+      "usageDetails": "用量明細",
+      "failed": "失敗",
+      "cost": "花費",
+      "input": "輸入",
+      "output": "輸出",
+      "cache": "快取",
+      "estimatedCost": "估算費用",
+      "reasoningTokens": "推理 {count}",
+      "shareRate": "佔比 {rate}",
+      "hitRate": "命中率 {rate}",
+      "successRate": "成功率 {rate}",
+      "failureRate": "失敗率 {rate}"
     },
     "trends": {
       "cost": "成本",
@@ -376,8 +387,6 @@
     "failedRequests": "失敗請求",
     "withinFilterRange": "篩選範圍內",
     "inputOutput": "輸入 {inputTokens} / 輸出 {outputTokens}",
-    "cachedTokens": "緩存 Token",
-    "cacheReadHit": "緩存讀取命中",
     "averageTimeTaken": "平均耗時",
     "successfulRequestAverage": "成功請求平均值",
     "usageOverview": "使用概覽",

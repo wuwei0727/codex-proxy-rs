@@ -23,19 +23,24 @@ const source = defineModel<string>({ required: true })
 </script>
 
 <template>
-  <div class="@container grid min-w-0 gap-4">
-    <div v-if="allowInherit" class="flex flex-wrap items-center justify-between gap-3">
-      <ZSegmented
-        v-model="source"
-        :aria-label="sourceLabel ?? t('settings.clientProfile.clientIdentitySource')"
-        class="shrink-0"
-        :options="[
-          ...(allowPreserve ? [{ label: t('accounts.modelAccess.reserve'), value: 'keep' }] : []),
-          { label: t('settings.clientProfile.globalConfiguration'), value: 'global' },
-          { label: t('settings.clientProfile.customConfiguration'), value: 'independent' },
-        ]"
-        :disabled="sourceDisabled"
-      />
+  <div class="@container grid min-w-0 gap-2.5">
+    <div v-if="allowInherit" class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <span v-if="sourceLabel" class="text-z-xs font-semibold text-z-text-secondary">
+          {{ sourceLabel }}
+        </span>
+        <ZSegmented
+          v-model="source"
+          :aria-label="sourceLabel ?? t('settings.clientProfile.clientIdentitySource')"
+          class="shrink-0"
+          :options="[
+            ...(allowPreserve ? [{ label: t('accounts.modelAccess.reserve'), value: 'keep' }] : []),
+            { label: t('settings.clientProfile.globalConfiguration'), value: 'global' },
+            { label: t('settings.clientProfile.customConfiguration'), value: 'independent' },
+          ]"
+          :disabled="sourceDisabled"
+        />
+      </div>
       <slot name="source-extra" />
     </div>
     <p v-if="loadError" role="alert" class="m-0 text-z-sm text-z-error">

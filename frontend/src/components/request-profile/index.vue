@@ -17,6 +17,7 @@ const props = withDefaults(defineProps<{
   initialProfiles?: ProviderRequestProfileUpdates
   allowInherit?: boolean
   provider?: BuiltinProvider
+  sourceLabel?: string
 }>(), {
   active: true,
   disabled: false,
@@ -93,15 +94,18 @@ watch(() => props.active, (active) => {
       :allow-preserve="updates !== undefined && initialProfiles?.[provider] === undefined"
       :active="active"
       :disabled="disabled"
+      :source-label="sourceLabel"
     >
       <template #source-extra>
-        <ProviderSelect
-          v-if="!props.provider"
-          v-model="selectedProvider"
-          class="max-w-full shrink-0"
-          :aria-label="t('settings.clientProfile.upstreamIdentityPlatform')"
-          :disabled="disabled"
-        />
+        <slot name="source-extra">
+          <ProviderSelect
+            v-if="!props.provider"
+            v-model="selectedProvider"
+            class="max-w-full shrink-0"
+            :aria-label="t('settings.clientProfile.upstreamIdentityPlatform')"
+            :disabled="disabled"
+          />
+        </slot>
       </template>
     </component>
   </div>

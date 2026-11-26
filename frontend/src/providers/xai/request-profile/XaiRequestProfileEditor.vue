@@ -65,7 +65,7 @@ function updateField(key: keyof ProfileSelection, value: string) {
 </script>
 
 <template>
-  <ProfileEditorFrame v-model="source" v-bind="frame" :source-label="t('settings.clientProfile.xaiClientIdentitySource')">
+  <ProfileEditorFrame v-model="source" v-bind="frame" :source-label="sourceLabel ?? t('settings.clientProfile.xaiClientIdentitySource')">
     <template #source-extra>
       <slot name="source-extra" />
     </template>

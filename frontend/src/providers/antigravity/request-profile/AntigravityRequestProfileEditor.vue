@@ -74,7 +74,7 @@ function updateSystemPrompt(value: string | null) {
 </script>
 
 <template>
-  <ProfileEditorFrame v-model="source" v-bind="frame">
+  <ProfileEditorFrame v-model="source" v-bind="frame" :source-label="sourceLabel">
     <template #source-extra>
       <slot name="source-extra" />
     </template>

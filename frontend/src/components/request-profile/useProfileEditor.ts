@@ -13,6 +13,7 @@ export interface ProfileEditorProps<Selection> {
   allowInherit: boolean
   allowPreserve: boolean
   draft?: Selection
+  sourceLabel?: string
 }
 
 export function useProfileEditor<

@@ -213,7 +213,18 @@
       "consumeTokens": "消耗 Tokens",
       "totalRequests": "总请求",
       "totalCost": "总成本",
-      "usageDetails": "用量明细"
+      "usageDetails": "用量明细",
+      "failed": "失败",
+      "cost": "花费",
+      "input": "输入",
+      "output": "输出",
+      "cache": "缓存",
+      "estimatedCost": "估算费用",
+      "reasoningTokens": "推理 {count}",
+      "shareRate": "占比 {rate}",
+      "hitRate": "命中率 {rate}",
+      "successRate": "成功率 {rate}",
+      "failureRate": "失败率 {rate}"
     },
     "trends": {
       "cost": "成本",
@@ -376,8 +387,6 @@
     "failedRequests": "失败请求",
     "withinFilterRange": "筛选范围内",
     "inputOutput": "输入 {inputTokens} / 输出 {outputTokens}",
-    "cachedTokens": "缓存 Token",
-    "cacheReadHit": "缓存读取命中",
     "averageTimeTaken": "平均耗时",
     "successfulRequestAverage": "成功请求平均值",
     "usageOverview": "使用概览",

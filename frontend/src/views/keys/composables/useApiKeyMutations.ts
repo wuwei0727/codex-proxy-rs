@@ -10,6 +10,7 @@ import { notification as ZNotification } from '@/plugins/notification'
 export function useApiKeyMutations(options: {
   selectedIds: Ref<Set<string>>
   reload: () => Promise<unknown>
+  setKeysEnabled: (ids: Iterable<string>, enabled: boolean) => void
 }) {
   const showDeleteModal = shallowRef(false)
   const showSingleDeleteModal = shallowRef(false)
@@ -17,9 +18,11 @@ export function useApiKeyMutations(options: {
   const deleteCount = shallowRef(0)
   const deletingKeyAction = useAsyncAction()
   const batchDeletingAction = useAsyncAction()
+  const batchTogglingAction = useAsyncAction()
   const updatingStatusKeys = useIdSet<string>()
   const deletingKey = deletingKeyAction.loading
   const batchDeleting = batchDeletingAction.loading
+  const batchToggling = batchTogglingAction.loading
   const updatingStatusKeyIds = updatingStatusKeys.ids
 
   watch([showDeleteModal, batchDeleting], ([open, busy]) => {
@@ -85,19 +88,44 @@ export function useApiKeyMutations(options: {
   async function handleToggleStatus(key: ApiKey) {
     await updatingStatusKeys.run(key.id, async () => {
       try {
-        const mutation = key.enabled ? disableApiKey : enableApiKey
+        const nextEnabled = !key.enabled
+        const mutation = nextEnabled ? enableApiKey : disableApiKey
         await mutation({ id: key.id })
-        await options.reload()
+        options.setKeysEnabled([key.id], nextEnabled)
         ZNotification.success({
-          message: key.enabled
-            ? t('common.status.disabled')
-            : t('common.status.enabled'),
+          message: nextEnabled
+            ? t('common.status.enabled')
+            : t('common.status.disabled'),
         })
       }
       catch {
         void options.reload()
       }
     })
+  }
+
+  async function handleBatchToggleStatus(enabled: boolean) {
+    if (batchToggling.value || options.selectedIds.value.size === 0)
+      return
+
+    await batchTogglingAction.run(
+      async () => {
+        const targetIds = [...options.selectedIds.value]
+        const mutation = enabled ? enableApiKey : disableApiKey
+        for (const keyId of targetIds) {
+          await mutation({ id: keyId })
+        }
+        options.setKeysEnabled(targetIds, enabled)
+        ZNotification.success({
+          message: enabled
+            ? t('common.status.enabled')
+            : t('common.status.disabled'),
+        })
+      },
+      {
+        onError: () => void options.reload(),
+      },
+    )
   }
 
   return {
@@ -107,10 +135,12 @@ export function useApiKeyMutations(options: {
     deleteCount,
     deletingKey,
     batchDeleting,
+    batchToggling,
     updatingStatusKeyIds,
     requestDeleteKey,
     handleDelete,
     handleBatchDelete,
     handleToggleStatus,
+    handleBatchToggleStatus,
   }
 }

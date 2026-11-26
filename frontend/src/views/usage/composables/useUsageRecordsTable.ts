@@ -102,14 +102,27 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
 
   type SummaryData = Omit<Awaited<ReturnType<typeof import('@/api').getUsageRecordSummary>>, 'analytics'>
   const filteredSummary = shallowRef<SummaryData | null>(null)
+  const filteredEstimatedCost = shallowRef<string | null>(null)
+
+  function parseUsdAmount(display?: string | null): number {
+    if (!display)
+      return 0
+    const normalized = display.replace(/[^0-9.-]/g, '')
+    const parsed = Number.parseFloat(normalized)
+    return Number.isFinite(parsed)
+      ? parsed
+      : 0
+  }
 
   async function updateFilteredSummary() {
     if (!isFineGrainedFiltered.value) {
       filteredSummary.value = null
+      filteredEstimatedCost.value = null
       return
     }
 
     const total = totalRecords.value
+    const isErrorStatus = options.status.value === 'error'
     if (total === 0) {
       filteredSummary.value = {
         totalRequests: '0',
@@ -120,6 +133,42 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
         cacheWriteInputTokens: '0',
         averageLatencyMsValue: 0,
         averageLatencyMs: '0 s',
+        logicalRequests: {
+          requestCount: 0,
+          successCount: 0,
+          failureCount: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          cacheWriteInputTokens: 0,
+          reasoningOutputTokens: 0,
+          totalTokens: 0,
+        },
+      }
+      filteredEstimatedCost.value = '0'
+      if (!isErrorStatus && (filterAccount.value || filterKey.value || filterModel.value)) {
+        try {
+          const errRes = await getUsageRecords({
+            ...snapshot(),
+            status: 'error',
+            currentPage: 1,
+            pageSize: 1,
+          })
+          if (filteredSummary.value?.logicalRequests) {
+            const errTotal = errRes.total ?? 0
+            filteredSummary.value = {
+              ...filteredSummary.value,
+              logicalRequests: {
+                ...filteredSummary.value.logicalRequests,
+                requestCount: errTotal,
+                failureCount: errTotal,
+              },
+            }
+          }
+        }
+        catch {
+          // ignore
+        }
       }
       return
     }
@@ -145,6 +194,8 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
     let sumInput = 0
     let sumOutput = 0
     let sumCached = 0
+    let sumReasoning = 0
+    let sumCostUsd = 0
     let sumLatency = 0
     let latencyCount = 0
 
@@ -154,6 +205,8 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
       sumInput += td?.inputTokens ?? 0
       sumOutput += td?.outputTokens ?? 0
       sumCached += td?.cachedInputTokens ?? 0
+      sumReasoning += td?.reasoningOutputTokens ?? 0
+      sumCostUsd += parseUsdAmount(r.billing?.totalAmountDisplay)
       if (r.latencyMs != null && r.latencyMs > 0) {
         sumLatency += r.latencyMs
         latencyCount++
@@ -167,9 +220,31 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
     const scaledInput = Math.round(sumInput * scale)
     const scaledOutput = Math.round(sumOutput * scale)
     const scaledCached = Math.round(sumCached * scale)
+    const scaledReasoning = Math.round(sumReasoning * scale)
+    const scaledCost = sumCostUsd * scale
     const avgLatency = latencyCount > 0
       ? sumLatency / latencyCount
       : 0
+
+    let failureCount = isErrorStatus ? total : 0
+    if (!isErrorStatus) {
+      try {
+        const errRes = await getUsageRecords({
+          ...snapshot(),
+          status: 'error',
+          currentPage: 1,
+          pageSize: 1,
+        })
+        failureCount = errRes.total ?? 0
+      }
+      catch {
+        // ignore
+      }
+    }
+
+    const totalWithFailures = isErrorStatus
+      ? total
+      : total + failureCount
 
     filteredSummary.value = {
       totalRequests: formatInteger(total),
@@ -182,7 +257,19 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
       averageLatencyMs: avgLatency < 1000
         ? `${Math.round(avgLatency)} ms`
         : `${(avgLatency / 1000).toFixed(2)} s`,
+      logicalRequests: {
+        requestCount: totalWithFailures,
+        successCount: isErrorStatus ? 0 : total,
+        failureCount,
+        inputTokens: scaledInput,
+        outputTokens: scaledOutput,
+        cachedInputTokens: scaledCached,
+        cacheWriteInputTokens: 0,
+        reasoningOutputTokens: scaledReasoning,
+        totalTokens: scaledTotal,
+      },
     }
+    filteredEstimatedCost.value = String(scaledCost)
   }
 
   const displaySummary = computed(() => {
@@ -190,6 +277,13 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
       return filteredSummary.value
     }
     return insights.summary.value.data
+  })
+
+  const displayCost = computed(() => {
+    if (isFineGrainedFiltered.value && filteredEstimatedCost.value !== null) {
+      return filteredEstimatedCost.value
+    }
+    return insights.cost.value.data?.data.summary.estimatedCost ?? null
   })
 
   function resetTable() {
@@ -296,6 +390,7 @@ export function useUsageRecordsTable(options: UseUsageRecordsTableOptions) {
     records,
     ...insights,
     displaySummary,
+    displayCost,
     refreshingList,
     loadUsageRecords,
     refreshUsageRecords,

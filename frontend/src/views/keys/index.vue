@@ -45,6 +45,7 @@ const {
   loading,
   apiKeys,
   loadApiKeys,
+  setKeysEnabled,
   searchQuery,
   sort,
   apiKeyPagination,
@@ -98,12 +99,14 @@ const {
   deleteCount,
   deletingKey,
   batchDeleting,
+  batchToggling,
   updatingStatusKeyIds,
   requestDeleteKey,
   handleDelete,
   handleBatchDelete,
   handleToggleStatus,
-} = useApiKeyMutations({ selectedIds, reload: loadApiKeys })
+  handleBatchToggleStatus,
+} = useApiKeyMutations({ selectedIds, reload: loadApiKeys, setKeysEnabled })
 
 const { allSelected, indeterminate, selectedRowKeys, toggleSelection, toggleAll } = usePageSelection(
   apiKeys,
@@ -166,9 +169,12 @@ watch([showFormModal, showBatchEdit], ([editor, batch]) => {
         <ApiKeyFilters
           v-model:search="searchQuery"
           :batch-deleting="batchDeleting"
+          :batch-toggling="batchToggling"
           :selected-count="selectedIds.size"
           @create="openCreate"
           @edit-selected="editSelectedKeys"
+          @enable-selected="handleBatchToggleStatus(true)"
+          @disable-selected="handleBatchToggleStatus(false)"
           @delete-selected="showDeleteModal = true"
         />
       </template>
@@ -234,7 +240,11 @@ watch([showFormModal, showBatchEdit], ([editor, batch]) => {
               </dl>
             </template>
             <template #enabled="{ row }">
-              <ApiKeyStatusBadge :api-key="row" />
+              <ApiKeyStatusBadge
+                :api-key="row"
+                :loading="updatingStatusKeyIds.has(row.id)"
+                @toggle="handleToggleStatus(row)"
+              />
             </template>
             <template #lastUsedAt="{ row }">
               <LastUsedAtCell :value="row.lastUsedAt" :full-display="row.lastUsedAtFullDisplay" />

@@ -19,12 +19,12 @@ const { t } = useI18n({ useScope: 'global' })
   </p>
   <div
     v-else-if="previewing || preview"
-    class="flex min-h-20 min-w-0 flex-col justify-between gap-2 rounded-z bg-z-fill-quaternary p-4"
+    class="flex min-w-0 flex-col justify-between gap-1 rounded-z bg-z-fill-quaternary px-3 py-2"
     aria-live="polite"
     :aria-busy="previewing"
   >
     <template v-if="previewing && !preview">
-      <div class="flex h-lh items-center text-z-sm" role="status" :aria-label="t('settings.clientProfile.resolvingClientIdentity')">
+      <div class="flex h-lh items-center text-z-xs" role="status" :aria-label="t('settings.clientProfile.resolvingClientIdentity')">
         <ZSkeleton shape="text" class="w-4/5" aria-hidden="true" />
       </div>
       <div class="flex h-lh items-center justify-end text-z-xs" aria-hidden="true">
@@ -32,7 +32,7 @@ const { t } = useI18n({ useScope: 'global' })
       </div>
     </template>
     <template v-else-if="preview">
-      <code class="break-all text-z-sm text-z-text">{{ preview.userAgent }}</code>
+      <code class="break-all text-z-xs leading-relaxed text-z-text">{{ preview.userAgent }}</code>
       <div class="flex flex-wrap items-end gap-x-3 gap-y-1">
         <p v-if="preview.error && preview.versionSource !== 'custom'" :title="preview.error" class="m-0 text-z-sm text-z-warning">
           {{ t('settings.clientProfile.updateFailedUseLastVersion') }}

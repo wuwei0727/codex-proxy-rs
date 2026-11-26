@@ -241,6 +241,18 @@ export interface UsageRecordsResponse {
   total: number
 }
 
+export interface UsageSummaryRequestMetrics {
+  requestCount: number
+  successCount: number
+  failureCount: number
+  inputTokens: number
+  outputTokens: number
+  cachedInputTokens: number
+  cacheWriteInputTokens: number
+  reasoningOutputTokens: number
+  totalTokens: number
+}
+
 export interface UsageSummaryResponse {
   analytics: AnalyticsMetadata
   totalRequests: string
@@ -251,6 +263,7 @@ export interface UsageSummaryResponse {
   totalTokens: string
   averageLatencyMs: string
   averageLatencyMsValue: number | null
+  logicalRequests?: UsageSummaryRequestMetrics
 }
 
 export interface UsageOverviewHealthPoint {

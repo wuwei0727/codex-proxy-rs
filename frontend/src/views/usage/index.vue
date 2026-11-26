@@ -78,6 +78,7 @@ const {
   records,
   summary,
   displaySummary,
+  displayCost,
   health,
   performance,
   cost,
@@ -155,7 +156,7 @@ watch(timeRange, () => {
     </header>
 
     <!-- 核心指标汇总紧凑卡片 -->
-    <UsageSummaryCards :summary="displaySummary" :status="recordView" :error="summary.error" class="mt-3" />
+    <UsageSummaryCards :summary="displaySummary" :estimated-cost="displayCost" :status="recordView" :error="summary.error" class="mt-3" />
 
     <!-- 图表洞察视图 -->
     <UsageInsightsGrid

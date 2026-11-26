@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import { ZButton, ZInput } from '@codex-proxy/ui'
 
-import { Pencil, Plus, Search, Trash2 } from '@lucide/vue'
+import { Pencil, Plus, Power, PowerOff, Search, Trash2 } from '@lucide/vue'
 
 import { useI18n } from 'vue-i18n'
 
 defineProps<{
   batchDeleting: boolean
+  batchToggling?: boolean
   selectedCount: number
 }>()
 
 const emit = defineEmits<{
   create: []
   deleteSelected: []
+  disableSelected: []
   editSelected: []
+  enableSelected: []
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
@@ -36,7 +39,19 @@ const search = defineModel<string>('search', { required: true })
     </div>
 
     <div class="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 md:ml-auto">
-      <ZButton v-if="selectedCount > 0" :disabled="batchDeleting" @click="emit('editSelected')">
+      <ZButton v-if="selectedCount > 0" :disabled="batchDeleting || batchToggling" @click="emit('enableSelected')">
+        <template #icon>
+          <Power class="size-4 text-z-success" />
+        </template>
+        {{ t('common.actions.enable') }} ({{ selectedCount }})
+      </ZButton>
+      <ZButton v-if="selectedCount > 0" :disabled="batchDeleting || batchToggling" @click="emit('disableSelected')">
+        <template #icon>
+          <PowerOff class="size-4 text-z-warning" />
+        </template>
+        {{ t('common.actions.disable') }} ({{ selectedCount }})
+      </ZButton>
+      <ZButton v-if="selectedCount > 0" :disabled="batchDeleting || batchToggling" @click="emit('editSelected')">
         <template #icon>
           <Pencil class="size-4" />
         </template>
@@ -45,7 +60,7 @@ const search = defineModel<string>('search', { required: true })
       <ZButton
         v-if="selectedCount > 0"
         type="danger" variant="plain"
-        :disabled="batchDeleting"
+        :disabled="batchDeleting || batchToggling"
         @click="emit('deleteSelected')"
       >
         <template #icon>
