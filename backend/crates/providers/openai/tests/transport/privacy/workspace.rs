@@ -2,12 +2,82 @@
 
 use super::*;
 
-fn anonymous_rule() -> PrivacyRule {
-    rule(
-        PrivacyScope::TurnMetadata,
-        "$.workspaces",
-        PrivacyAction::AnonymizeWorkspace,
-    )
+#[test]
+fn project_anonymization_preserves_usernames_and_git_information() {
+    for path in [
+        "/home/alex/projects/private",
+        "/Users/alex/private",
+        r"C:\Users\alex\private",
+    ] {
+        let metadata = json!({"associated_remote_urls":{"origin":"https://example.invalid/team/private"},"latest_git_commit_hash":"abc","has_changes":true});
+        let mut request = sample(
+            vec![rule(
+                PrivacyScope::TurnMetadata,
+                "$.workspaces",
+                PrivacyAction::AnonymizeProject,
+            )],
+            json!({"turn_metadata":{"workspaces":{path:metadata}}}),
+        );
+        request
+            .headers
+            .insert("session-id".into(), vec!["sample-session".into()]);
+        let output = preview(request).unwrap();
+        let (alias, value) = output.body["turn_metadata"]["workspaces"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .next()
+            .unwrap();
+        assert!(alias.starts_with(path.rsplit_once(['/', '\\']).unwrap().0));
+        assert_ne!(alias, path);
+        assert_eq!(value, &metadata);
+    }
+}
+
+#[test]
+fn workspace_steps_allow_customizing_username_and_retaining_remotes() {
+    for path in [
+        "/home/alex/projects/private",
+        "/Users/alex/private",
+        r"C:\Users\alex\private",
+    ] {
+        let metadata = json!({"workspaces":{path:{"associated_remote_urls":{"origin":"https://example.invalid/team/private"},"latest_git_commit_hash":"abc","has_changes":true}}});
+        let mut customized = workspace_rule("blg");
+        customized.steps.remove(2);
+        let mut request = sample(
+            vec![customized],
+            json!({"client_metadata":{"x-codex-turn-metadata":metadata.to_string()}}),
+        );
+        request.turn_metadata = Some(metadata.to_string());
+        request
+            .headers
+            .insert("session-id".into(), vec!["sample-session".into()]);
+        request
+            .headers
+            .insert("x-codex-turn-metadata".into(), vec![metadata.to_string()]);
+        let output = preview(request).unwrap();
+        let value: Value = serde_json::from_str(output.turn_metadata.as_deref().unwrap()).unwrap();
+        let (alias, workspace) = value["workspaces"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .next()
+            .unwrap();
+        assert!(
+            alias.starts_with(
+                &path
+                    .rsplit_once(['/', '\\'])
+                    .unwrap()
+                    .0
+                    .replace("alex", "blg")
+            )
+        );
+        assert_eq!(
+            workspace["associated_remote_urls"],
+            metadata["workspaces"][path]["associated_remote_urls"]
+        );
+        assert!(workspace.get("latest_git_commit_hash").is_none());
+    }
 }
 
 #[test]
@@ -25,7 +95,7 @@ fn aliases_preserve_path_style_and_execution_context_across_all_carriers() {
         let metadata = json!({"workspaces":{path:{"associated_remote_urls":{"origin":"https://example.invalid/team/private"},"latest_git_commit_hash":"abc","has_changes":true}},"request_kind":"turn"});
         let original_input = json!([{"role":"user","content":format!("<cwd>{path}</cwd>")}]);
         let mut request = sample(
-            vec![anonymous_rule()],
+            vec![workspace_rule("user")],
             json!({
                 "input":original_input,
                 "turnMetadata":metadata,
@@ -94,7 +164,7 @@ fn aliases_preserve_path_style_and_execution_context_across_all_carriers() {
         {
             assert_eq!(serde_json::from_str::<Value>(raw).unwrap(), expected);
         }
-        assert_eq!(result.outcomes[0].matches, 7);
+        assert_eq!(result.outcomes[0].matches, 28);
         assert_eq!(preview(request.clone()).unwrap().body, result.body);
         request
             .headers
@@ -110,7 +180,7 @@ fn aliases_preserve_path_style_and_execution_context_across_all_carriers() {
 fn long_workspace_names_produce_valid_directory_components() {
     let path = format!("/workspace/{}", "工程".repeat(40));
     let mut request = sample(
-        vec![anonymous_rule()],
+        vec![workspace_rule("user")],
         json!({"turn_metadata":{"workspaces":{path:{}}}}),
     );
     request
@@ -130,7 +200,7 @@ fn long_workspace_names_produce_valid_directory_components() {
 
 #[test]
 fn multiple_workspaces_remain_stable_as_the_workspace_set_grows() {
-    let compiled = compile(&policy(vec![anonymous_rule()])).unwrap();
+    let compiled = compile(&policy(vec![workspace_rule("user")])).unwrap();
     let transform = |scope, count| {
         let mut entries = serde_json::Map::new();
         for n in 0..count {
@@ -168,7 +238,7 @@ fn multiple_workspaces_remain_stable_as_the_workspace_set_grows() {
 fn workspace_failure_rolls_back_every_copy_and_respects_policy() {
     let original = json!({"turn_metadata":{"workspaces":{"/Users/alex/projects/private":{"latest_git_commit_hash":"abc"}}}});
     for (scope, invalid_header) in [(None, false), (Some("session"), true)] {
-        let mut config = policy(vec![anonymous_rule()]);
+        let mut config = policy(vec![workspace_rule("user")]);
         config.on_error = PrivacyFailureMode::SkipRule;
         let mut body = original.clone();
         let mut headers = reqwest::header::HeaderMap::new();
@@ -195,7 +265,7 @@ fn workspace_failure_rolls_back_every_copy_and_respects_policy() {
         );
     }
     assert!(
-        preview(sample(vec![anonymous_rule()], json!({})))
+        preview(sample(vec![workspace_rule("user")], json!({})))
             .unwrap()
             .outcomes[0]
             .matches
@@ -209,7 +279,7 @@ fn workspace_failure_rolls_back_every_copy_and_respects_policy() {
             compile(&policy(vec![rule(
                 scope,
                 selector,
-                PrivacyAction::AnonymizeWorkspace
+                PrivacyAction::AnonymizeProject
             )]))
             .is_err()
         );

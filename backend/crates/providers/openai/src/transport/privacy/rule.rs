@@ -16,7 +16,7 @@ pub(super) struct CompiledStep {
 
 impl CompiledStep {
     pub(super) fn compile(rule: &PrivacyStep) -> Result<Self, &'static str> {
-        if rule.action == PrivacyAction::AnonymizeWorkspace
+        if rule.action == PrivacyAction::AnonymizeProject
             && (rule.scope != PrivacyScope::TurnMetadata
                 || rule.selector != "$.workspaces"
                 || rule.pattern.is_some())
@@ -99,8 +99,8 @@ impl CompiledStep {
     ) -> Result<bool, &'static str> {
         budget.step()?;
         match self.rule.action {
-            PrivacyAction::AnonymizeWorkspace => {
-                *count += super::workspace::anonymize(value, budget)?;
+            PrivacyAction::AnonymizeProject => {
+                *count += super::workspace::anonymize_project(value, budget)?;
             }
             PrivacyAction::RemoveField => {
                 if let Some(regex) = &self.regex {

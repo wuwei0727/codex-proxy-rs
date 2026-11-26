@@ -109,7 +109,7 @@ const columns = computed(() => (defineTableColumns<PrivacyRule>([
     key: 'action',
     label: t('settings.privacy.rules.processingMethod'),
     kind: 'meta',
-    size: 'md',
+    size: '2xl',
   },
   {
     key: 'actions',

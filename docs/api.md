@@ -253,6 +253,8 @@ Messages 与 Responses 的转换边界见 [Messages 请求](#messages-请求)，
 
 客户端用 `Authorization: Bearer <Client Key>` 访问以下 GenAI 短路径。模型名取自 URL，入口只在当前 Key 的账号范围内选择声明 GenAI 协议的原生模型。目前由 Antigravity 使用 OAuth 账号查询上游项目和可用模型。目录与凭据版本绑定，调度选定账号后，网关把原生正文、项目和模型发送到该注册对应的资源服务。个人账号的登录可用性见下文的 Antigravity OAuth。
 
+上游目录声明的模型分组支持使用基础模型名，并通过 `generationConfig.thinkingConfig.thinkingLevel` 指定档位，例如 `gemini-4-hydrogen` 配合 `MEDIUM`。网关只选择该账号目录明确列出的分组成员，账号和分组模型限制按最终型号校验；目录中至少有一个可访问档位时才显示基础模型名。缺少或不支持的档位返回 400，显式完整型号及指向完整型号的模型映射保持原目标。分组能力随上游目录刷新，旧缓存未包含分组时仍只提供完整型号
+
 | 方法 | 路径 | 交付 |
 | --- | --- | --- |
 | POST | `/v1beta/models/{model}:generateContent` | 原生 JSON |
@@ -1727,8 +1729,9 @@ Messages API Key 账号支持生成与输入计数，通过协议转换承接 Re
 互联账号按上游 Key 已提供的最长消费窗口统计本机 Token、费用和模型用量。
 日、周周期的 `usage.windowKind` 分别为 `daily`、`weekly`，其他周期为 `quota`。查询边界同账号额度窗口，为 `[resetAt - windowSeconds, resetAt)`；
 未开启或缺少重置边界时显示无数据，不回退到历史累计，也不采用池内其他账号的周期。
-OAuth 账号优先按可归属整个账号的实际周/月额度窗口统计，缺少可归属窗口时使用过去 24 小时的本地请求统计
-此时 `usage.windowKind` 为 `daily`，Token 与模型用量共用该范围，上游额度快照缺失时仍可展示本地统计
+OAuth 账号优先按可归属整个账号的实际周/月额度窗口统计，缺少可归属窗口时使用 Provider 声明的本地统计范围。
+Antigravity 按部署时区汇总今天及前 6 天，`usage.windowKind` 为 `recent_week`，管理端显示“近一周”；其他 Provider 默认使用过去 24 小时，返回 `daily`。
+Token 与模型用量共用该范围，上游额度快照缺失时仍可展示本地统计；账号请求小时图仍独立展示最近 24 个 UTC 小时桶
 
 批量导入 AT / RT 使用 `accounts` JSON 数组，最多 200 项，不接受纯文本 token 列表。例如：
 
@@ -1941,8 +1944,7 @@ OpenAI 授权码交换与令牌刷新请求的连接超时为 30 秒，单次上
 - OAuth 账号详情的 Token 统计、模型排行和列表 Token 汇总优先使用账号级周额度窗口，无可统计的周窗口时
   使用月额度窗口；`usage.windowKind` 随选中的窗口返回 `weekly` 或 `monthly`。查询边界
   严格为 `[resetAt - windowSeconds, resetAt)`，不是自然周/月或最近 7/30 天；额度刷新若返回了更早的
-  重置时间，会按新边界重新聚合。没有边界完整、可归属到账号的周/月窗口时显示无数据，`usage.windowKind` 为 `quota`
-  （周/月额度窗口），不回退到 5 小时、日窗口或历史累计。
+  重置时间，会按新边界重新聚合。没有可归属整号的额度窗口时，按上述 Provider 本地统计范围展示，不能把模型分组额度归为整号用量。
   金额原值保持完整精度，USD 展示值
   小于 1 美元时最多保留四位小数，其余最多保留两位，小数末尾不补零。
   额度百分比展示最多保留一位小数，小数末尾不补零；数值为零时返回 `0%`
@@ -2430,7 +2432,7 @@ Antigravity 不应用这组国家、区域、城市和时区覆盖，原生请�
 JSON 路径支持 `$`、`.成员`、`["带特殊字符的键"]`、`[索引]`、`.*` 和 `[*]`，不支持递归和过滤表达式。
 缺少字段视为未命中；类型不符属于执行失败。`regex_replace` 替换字符串，`set_value` 保持原字段类型设置 JSON 值，
 `rename_key` 替换所选对象的直接键名，重名时失败；`remove_field` 删除所选字段或数组项，不能删除作用范围根节点。
-`anonymize_workspace` 仅用于 `turn_metadata` 的 `$.workspaces`，`pattern` 必须为 `null`，按逻辑会话改写工程路径并删除 Git 远端与提交 metadata
+`anonymize_project` 仅用于 `turn_metadata` 的 `$.workspaces`，`pattern` 必须为 `null`，按账号与逻辑会话改写项目名，保留父目录、用户名及映射内的 metadata
 删除动作的 `pattern: null` 表示无条件删除，字符串模式表示只删除字符串值匹配的字段或数组项。
 请求头规则生成的值必须是 ASCII 文本，以保持 HTTP 与 WebSocket opening 的一致性；metadata 范围会自动转义 Unicode
 
@@ -2452,11 +2454,18 @@ WebSocket 请求头在握手时发送。隐私规则改变握手头时，普通�
 UA、平台参数及自动 Git 上下文版本由 [OpenAI 上游客户端身份](#openai-上游客户端身份)管理。
 保存后的规则按其 `steps` 执行，不随预设定义变化
 
-「按账号与会话匿名化工作区」预设使用 `anonymize_workspace`，保留路径分隔符与父目录层级，将用户目录中的用户名改为 `user`。
+「按账号与会话匿名化工作区」预设按顺序生成四个可编辑步骤：
+
+1. `anonymize_project` 根据原始路径生成项目化名，保留分隔符与父目录
+2. `rename_key` 将 Linux、macOS 和 Windows 用户目录中的用户名改为 `user`，替换内容可自定义
+3. `remove_field` 删除 `$.workspaces.*.associated_remote_urls`
+4. `remove_field` 删除 `$.workspaces.*.latest_git_commit_hash`
+
+各步骤可以修改、删除或调整顺序；用户名替换与 Git 信息处理不由项目匿名化动作隐式执行。
 工程名取原名的前 48 个字母或数字打乱顺序，再加两组 1～1000 的数字和短后缀；没有字母或数字时使用 `project`。
 例如 `codex-proxy-rs` 可变为 `xrpceodxroys-427-83-a1b2c3d4`。同一 Client Key、账号、逻辑会话和工作区的化名在重试与重启后保持一致；
 换账号、新会话或更换工作区重新派生化名，切回原账号和原会话恢复对应化名，不保存路径映射表。正常令牌续期与代理出口变化不重置化名。
-映射内的 `associated_remote_urls`、`latest_git_commit_hash` 被移除，其余字段保留。真实执行目录、正文和工具参数保持原值，仍可能暴露真实路径
+默认组合移除 Git 远端与提交信息，其余字段保留。真实执行目录、正文和工具参数保持原值，仍可能暴露真实路径
 
 工作区必须是绝对路径，映射值必须是对象。缺少稳定会话身份、路径无效或化名冲突时按策略失败模式处理，不随机补造会话。
 预览从样本请求头或正文识别会话，可在样本的 `headers` 中填写 `"session-id": ["example-session"]`；预览只使用样本身份，实际出站另外按 Client Key 和选定账号隔离
@@ -2675,6 +2684,10 @@ models.dev 同步只导入可表示为当前文本 Token 计价的 OpenAI/xAI �
 更新时省略某项保留原值，对象替换该项，`null` 删除显式选择并使用 Provider 默认值；不清除其他 Provider 的配置。
 配置内容由对应 Provider 校验，不包含账号凭据。Key 可通过 `providerRequestProfileOverrides` 整体覆盖所属 Provider 的选择
 
+OpenAI、xAI、Antigravity 的模型请求均按 Key 覆盖优先、其次全局的顺序选择身份。
+OAuth、令牌续期、额度刷新、订阅和模型目录查询等账号后台操作使用所属平台的全局身份，
+不读取单个 Key 的覆盖；修改全局配置后，下次执行采用新选择
+
 各 Provider 的选项响应均包含 `globalConfiguration`。OpenAI 返回六个 `presets`、`maxVersionLag` 和
 `recognizedUserAgentPrefixes`。匹配前缀时，OpenAI 从 UA 派生 originator 与 Core 版本，其他自定义 UA 需要提供这两个字段。
 xAI 返回 `defaults`，Antigravity 返回 `defaults` 与 `presets`
@@ -2682,9 +2695,9 @@ xAI 返回 `defaults`，Antigravity 返回 `defaults` 与 `presets`
 ### OpenAI 上游客户端身份
 
 OpenAI 通用身份默认使用 `MacOS · Desktop · 自动最新`。
-该配置作用于 Client Key 的 OpenAI 模型请求，适用于 HTTP/SSE、WebSocket、Images 和 Search，
-也用于账号模型目录的后台发现、手动刷新、导出及定时预热；下次执行时采用当前全局选择，不使用单个 Key 的覆盖。
-不改变 xAI、入站客户端版本门禁、账号认证或后台 Desktop 专属操作
+模型请求覆盖 HTTP/SSE、WebSocket、Images 和 Search。后台全局身份还作用于授权链接的客户端参数、
+PAT 验证、额度重置卡、资料、头像和定时预热；各端点保留各自的请求头格式。
+该配置不覆盖浏览器授权页的 UA，不保证上游登录通知中的设备标签与之相同，也不改变入站客户端版本门禁
 
 自定义配置使用 `{ "mode": "custom", "userAgent": "完整 UA" }`。
 已识别的 `Codex Desktop`、`codex-tui`、`codex_exec`、`codex_cli_rs` 前缀由后端解析 `originator` 和 Core `version`，
@@ -2712,6 +2725,9 @@ UA 须为 1 至 4096 字节的单行可见 ASCII 文本，首尾不能含空白�
 TUI 默认标识为 `codex-tui`，Exec 为 `codex_exec`，入口后缀使用同一次解析的 Core 版本。
 `originator` 覆盖只更改产品名前缀和配套头，后缀仍表示所选入口。省略 `osType` 使用平台名称；
 自定义运行环境在自动更新时保持不变。未指定 `cliEntry` 时使用 `codex_cli_rs` 默认值且不添加入口后缀
+
+macOS 的默认系统版本为 `27.2.1`。选择 macOS CLI 预设时，配置包含 `cliEntry: "tui"` 和
+`terminal: "Apple_Terminal/488.9"`；已保存的入口和终端配置不随预设变化而改写
 
 `terminal` 填写官方客户端的真实终端标记，如 `iTerm.app/3.5.0`、`vscode/1.99.0`、`Apple_Terminal`、
 `Ghostty`、`WindowsTerminal`、`tmux-256color`、`xterm-256color`。省略时使用 `unknown`：

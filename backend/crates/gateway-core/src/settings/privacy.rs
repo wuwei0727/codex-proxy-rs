@@ -48,7 +48,7 @@ pub enum PrivacyAction {
     SetValue,
     RenameKey,
     RemoveField,
-    AnonymizeWorkspace,
+    AnonymizeProject,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
